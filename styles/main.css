@@ -1,0 +1,52 @@
+
+html, body {
+}
+
+#options {
+	position: fixed;
+	right: 50px;
+	top: 10px;
+	background-color: rgba(0, 0, 0, 0.6);
+	border-radius: 8px;
+	box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
+	padding: 10px;
+	overflow-y: hidden;
+	width: 260px;
+}
+
+.section {
+	border: 1px solid #404040;
+	background: rgba(0, 0, 0, 0.3);
+	color: #FFFFFF;
+	margin-top: 4px;
+	border-radius: 8px;
+	padding: 8px;
+	font-family: georgia;
+}
+
+.section-title {
+	font-weight: bold;
+	text-align: center;
+	width: 100%;
+	display: block;
+}
+
+.button {
+	width: 10px;
+	height: 10px;
+	border-radius: 8px;
+	background: #0D0;
+	display: block;
+	float: left;
+	margin-right: 5px;
+	margin-top: 4px;
+	border: #000 thin solid;
+}
+
+.button:hover {
+	background: #0F0;
+}
+
+#objectsInput {
+	color: #000;
+}
