@@ -240,6 +240,7 @@ define(function(){
 
 	return {
 		initialize: initialize,
-		step: step
+		step: step,
+		UI: UI
 	};
 });

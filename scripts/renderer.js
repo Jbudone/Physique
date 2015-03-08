@@ -11,6 +11,7 @@ define(function(){
 			camera   = null,
 			renderer = null;
 
+		var _me = this;
 		var texturePack = {
 
 			textureList: {
@@ -30,6 +31,7 @@ define(function(){
 				try {
 
 					scene = new THREE.Scene();
+					_me.scene = scene;
 					camera = new THREE.PerspectiveCamera( settings.camera.fov, settings.camera.aspect, settings.camera.near, settings.camera.far );
 
 					renderer = new THREE.WebGLRenderer();
@@ -179,7 +181,8 @@ define(function(){
 			if (meshProps.type === MESH_BOX) {
 
 				geometry = new THREE.BoxGeometry( 1, 1, 1, 1, 1, 1 );
-				material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
+				// material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
+				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
 				mesh.dimensions = { height: 1, width: 1, depth: 1 };
@@ -192,7 +195,7 @@ define(function(){
 			} else if (meshProps.type === MESH_PLANE) {
 
 				// geometry = new THREE.PlaneGeometry( 40, 40, 1, 1 );
-				geometry = new THREE.BoxGeometry( 40, 1, 40, 1, 1, 1 );
+				geometry = new THREE.BoxGeometry( 40, 5, 40, 1, 1, 1 );
 				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 

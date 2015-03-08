@@ -42,7 +42,15 @@
 			- report contact manifold
 		* CR
 			- Angular velocity
-			- Contact caching: what if vertex from object A shows up in 2 separate contacts w/ object B? Cache separately for each object, or iterate through object A's vert twice?
+			- restitution?
+			- baumgarte?
+			- pre-sequential solvers?
+			- friction
+			- slop
+			- FIX contact.tangent and contact.tangent2 (EVERYTHING that uses them needs to have the correct sign)
+
+			- BUG: resting contact
+			- BUG: box sometimes slips
 
 			- check if point is colliding: check against normal of every face
 		* UI: edit clock
@@ -75,6 +83,7 @@
 	<script src="scripts/libs/underscore-min.js"></script>
 	<script src="scripts/libs/modernizr.min.js"></script>
 	<script src="scripts/libs/require.js"></script>
+	<script src="scripts/GoblinPhysics/build/goblin.js"></script>
 	<script>
 		requirejs.config({
 			"baseUrl": "scripts",

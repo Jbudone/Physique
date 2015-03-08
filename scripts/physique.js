@@ -13,7 +13,23 @@ define(function(){
 		this.world = {
 			gravity: -9.8,
 			scaleTime: 0.001,
+
+			slop: 0.001,
+			damping: 1.00,
+
+			maxContactsInManifold: 4
 		};
+
+		var TEST_ScaleT1 = 1,
+			TEST_ScaleT2 = -1,
+			TEST_T1Factor = 1,
+			TEST_T2Factor = 1,
+			TEST_DenomFactor1 = 1,
+			TEST_DenomFactor2 = 1,
+			TEST_NormTangent = true;
+
+		var mass = 1,
+			inertia = 2;
 
 		/*****************************************************************
 		 *****************************************************************
@@ -352,15 +368,21 @@ define(function(){
 						// FIXME FIXME FIXME FIXME FIXME FIXME!
 					var faceNormalIsGood = function(face){
 
-						if (face.normal.dot(polytope.vertices[face.a]) <= 0) return false;
-						if (face.normal.dot(polytope.vertices[face.b]) <= 0) return false;
-						if (face.normal.dot(polytope.vertices[face.c]) <= 0) return false;
+						if (face.normal.dot(polytope.vertices[face.a]) <= 0 ||
+							face.normal.dot(polytope.vertices[face.b]) <= 0 ||
+							face.normal.dot(polytope.vertices[face.c]) <= 0) {
+
+								face.normal.negate();
+								return false;
+						}
 						return true;
 					};
-					if (!faceNormalIsGood(polytope.faces[0])) debugger;
-					if (!faceNormalIsGood(polytope.faces[1])) debugger;
-					if (!faceNormalIsGood(polytope.faces[2])) debugger;
-					if (!faceNormalIsGood(polytope.faces[3])) debugger;
+					
+					var darn=0;
+					if (!faceNormalIsGood(polytope.faces[0])) ++darn; //debugger;
+					if (!faceNormalIsGood(polytope.faces[1])) ++darn; //debugger;
+					if (!faceNormalIsGood(polytope.faces[2])) ++darn; //debugger;
+					if (!faceNormalIsGood(polytope.faces[3])) ++darn; //debugger;
 					var _pHashTable = {};
 					for (var i=0; i<polytope.vertices.length; ++i) {
 						var p = polytope.vertices[i],
@@ -467,11 +489,19 @@ define(function(){
 							// FIXME FIXME FIXME FIXME FIXME FIXME!
 
 							var contact = contactA.add(contactB).multiplyScalar(0.5);
+							contact.iA = contactA.i;
+							contact.iB = contactB.i;
+
+							var norm = nearestFace.face.normal.negate();
+							if (norm.dot(bodyA.position.clone().sub(bodyB.position)) < 0) {
+								debugger;
+								norm.negate();
+							}
 							return {
 								originA: contact,
 								originB: contact,
 
-								normal: nearestFace.face.normal.negate(),
+								normal: norm,
 								depth: nearestFace.distance,
 
 								bodyA: bodyA,
@@ -940,6 +970,7 @@ define(function(){
 
 		};
 
+		var FIXMEBlock = true;
 		var Contact = function(contact){
 
 			this.bodyA = contact.bodyA;
@@ -950,8 +981,13 @@ define(function(){
 			this.vertexB = contact.originB;
 			this.depth = contact.depth;
 
-			this.tangent = this.vertexA.clone().sub(this.bodyA.position).cross( this.normal ); // FIXME: using correct normal?
-			this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).cross( this.normal.clone().negate() );// FIXME: using correct normal
+			this.tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: using correct normal?
+			this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal );// FIXME: using correct normal
+
+			if (TEST_NormTangent) {
+				this.tangent.normalize();
+				this.tangent2.normalize();
+			}
 
 			this.appliedImpulse =0;
 			this.appliedPushImpulse = 0;
@@ -964,6 +1000,7 @@ define(function(){
 					var face = body.geometry.faces[i],
 						pointNorm = body.geometry.vertices[face.a].clone().applyQuaternion(body.quaternion).add(body.position).sub(point);
 					if (face.normal.clone().applyQuaternion(body.quaternion).dot(pointNorm) < 0) {
+						debugger;
 						return false;
 					}
 				}
@@ -983,11 +1020,16 @@ define(function(){
 			this.setJacobian = function(row){
 
 				if (this.bodyA && this.bodyA.invMass !== 0) {
-					row.J[0] = -this.normal.x;
-					row.J[1] = -this.normal.y;
-					row.J[2] = -this.normal.z;
+					row.J[0] = this.normal.x;
+					row.J[1] = this.normal.y;
+					row.J[2] = this.normal.z;
 
-					var tangent = this.vertexA.clone().sub(this.bodyA.position).negate().cross( this.normal ); // FIXME: WHAT IS THIS?!
+					var tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: WHAT IS THIS?!
+
+					if (TEST_NormTangent) {
+						tangent.normalize();
+					}
+
 					row.J[3] = tangent.x;
 					row.J[4] = tangent.y;
 					row.J[5] = tangent.z;
@@ -997,11 +1039,15 @@ define(function(){
 				}
 
 				if (this.bodyB && this.bodyB.invMass !== 0) {
-					row.J[6] = this.normal.x;
-					row.J[7] = this.normal.y;
-					row.J[8] = this.normal.z;
+					row.J[6] = -this.normal.x;
+					row.J[7] = -this.normal.y;
+					row.J[8] = -this.normal.z;
 
-					var tangent = this.vertexB.clone().cross( this.normal ); // FIXME: WHAT IS THIS?!
+					var tangent = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal ); // FIXME: WHAT IS THIS?!
+
+					if (TEST_NormTangent) {
+						tangent.normalize();
+					}
 					row.J[9]  = tangent.x;
 					row.J[10] = tangent.y;
 					row.J[11] = tangent.z;
@@ -1019,8 +1065,13 @@ define(function(){
 					this.normal = contact.normal;
 					this.vertexA = contact.originA;
 					this.vertexB = contact.originB;
-					this.tangent = this.vertexA.clone().sub(this.bodyA.position).cross( this.normal ); // FIXME: using correct normal?
-					this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).cross( this.normal.clone().negate() );// FIXME: using correct normal
+					this.tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: using correct normal?
+					this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal );// FIXME: using correct normal
+
+					if (TEST_NormTangent) {
+						this.tangent.normalize();
+						this.tangent2.normalize();
+					}
 					this.depth = contact.depth;
 					this.setJacobian(this.rows[0]);
 				}
@@ -1029,11 +1080,12 @@ define(function(){
 				this.JDiagABInv = 0;
 				var denom1 = 0, denom2 = 0;
 				if (this.bodyA && this.bodyA.invMass !== 0) {
-					denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
+					// denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
+					denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(TEST_DenomFactor1*this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
 				}
 
 				if (this.bodyB && this.bodyB.invMass !== 0) {
-					denom2 = this.bodyB.invMass + this.normal.dot( this.tangent2.clone().multiplyScalar(this.bodyB.invInertiaTensor).cross( this.vertexB.clone().sub(this.bodyB.position) ) );
+					denom2 = this.bodyB.invMass + this.normal.dot( this.tangent2.clone().multiplyScalar(TEST_DenomFactor2*this.bodyB.invInertiaTensor).cross( this.vertexB.clone().sub(this.bodyB.position) ) );
 				}
 
 				var relaxation = 1.0;
@@ -1127,8 +1179,8 @@ define(function(){
 
 			this.updateContact = function(contact){
 
-				if (contact.depth < 0.01) return; // FIXME: slop
-				contact.depth -= 0.01;
+				if (contact.depth < physique.world.slop) return; // FIXME: slop
+				contact.depth -= physique.world.slop;
 				var hash = this.hashContactVerts(contact);
 				contact.vHash = hash;
 				if (this.contacts.hasOwnProperty(hash)) {
@@ -1153,7 +1205,7 @@ define(function(){
 				// 	}
 				// }
 
-				if (this.length >= 4) {
+				if (this.length >= physique.world.maxContactsInManifold) {
 					// Replace weakest contact with this one
 					var weakestContactDepth = -99999,
 						weakestContactI = null;
@@ -1194,7 +1246,7 @@ define(function(){
 					// 	worldB = contact.vertexB.clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position),
 					// 	diff   = worldA.sub(worldB);
 
-					var newVertexA = contact.bodyA.geometry.vertices[ contact.vertexA.i ].clone().applyQuaternion( contact.bodyA.quaternion ).add( contact.bodyA.position );
+					// var newVertexA = contact.bodyA.geometry.vertices[ contact.vertexA.i ].clone().applyQuaternion( contact.bodyA.quaternion ).add( contact.bodyA.position );
 					// var diff = newVertexA.clone().sub( contact.vertexA );
 
 					// var diff = contact.vertexB.clone().sub( contact.vertexA.clone().sub( contact.normal.clone().multiplyScalar( contact.depth ) ) );
@@ -1202,7 +1254,7 @@ define(function(){
 					// var diff = contact.vertexA.clone().sub( contact.vertexB );
 
 					// var normalLine = new THREE.Line3( contact.vertexB, (new THREE.Vector3()).copy(contact.vertexB).add(contact.normal.clone().multiplyScalar(contact.depth)) );
-					var normalLine = new THREE.Line3( contact.vertexA.clone().add(contact.normal.clone().multiplyScalar(contact.depth)), contact.vertexA.clone() );
+					// var normalLine = new THREE.Line3( contact.vertexA.clone().add(contact.normal.clone().multiplyScalar(contact.depth)), contact.vertexA.clone() );
 
 					// var diff = normalLine.closestPointToPoint( newVertexA ).sub( contact.vertexA );
 					// if (diff.lengthSq() > contact.depth * contact.depth + 0.0001) {
@@ -1211,13 +1263,24 @@ define(function(){
 
 					// var diff = normalLine.closestPointToPointParameter( newVertexA );
 					// if (diff > 1.0001 || diff < -2.0) {
-					if (!contact.isPointInContact(newVertexA, contact.bodyB)) {
+					var newDistance = contact.bodyA.geometry.vertices[contact.vertexA.iA].clone().applyQuaternion(contact.bodyA.quaternion).add(contact.bodyA.position).sub( contact.bodyB.geometry.vertices[contact.vertexB.iB].clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position) ).dot( contact.normal );
+					if (newDistance >= -physique.world.slop || newDistance < -1.0) {
 						physique.onRemoveContact(contact.hash + contact.vHash);
 						contact.remove();
 						delete this.contacts[contactID];
 						--this.length;
 						continue;
 					}
+
+					// if (!contact.isPointInContact(newVertexA, contact.bodyB)) {
+					// 	physique.onRemoveContact(contact.hash + contact.vHash);
+					// 	contact.remove();
+					// 	delete this.contacts[contactID];
+					// 	--this.length;
+					// 	continue;
+					// }
+
+					contact.depth = -newDistance;
 
 					contact.update();
 				}
@@ -1231,6 +1294,17 @@ define(function(){
 			}
 
 			contactManifolds[contact.hash].updateContact(contact);
+		};
+
+		this.removeManifold = function(hash){
+			if (contactManifolds[hash]) {
+				var manifold = contactManifolds[hash];
+				for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[contactID];
+					physique.onRemoveContact(contact.hash + contact.vHash);
+				}
+				delete contactManifolds[hash];
+			}
 		};
 
 		this.updateManifolds = function(){
@@ -1247,56 +1321,21 @@ define(function(){
 
 		this.solveConstraints = function(){
 
-			// Warm start
-			/*
 			for (var manifoldID in contactManifolds) {
 
 				var manifold = contactManifolds[manifoldID];
 				for (var contactID in manifold.contacts) {
 
 					var contact = manifold.contacts[contactID];
-					for (var iRow=0; iRow<contact.rows.length; ++iRow) {
-
-						var row = contact.rows[iRow],
-							warmth = row.lagrange * 0.95;
-						row.lagrange = warmth;
-
-						if (contact.bodyA && contact.bodyA.invMass !== 0) {
-							contact.bodyA.impulse[0] += warmth * row.B[0];
-							contact.bodyA.impulse[1] += warmth * row.B[1];
-							contact.bodyA.impulse[2] += warmth * row.B[2];
-
-							contact.bodyA.impulse[3] += warmth * row.B[3];
-							contact.bodyA.impulse[4] += warmth * row.B[4];
-							contact.bodyA.impulse[5] += warmth * row.B[5];
-						}
-
-						if (contact.bodyB && contact.bodyB.invMass !== 0) {
-							contact.bodyB.impulse[0] += warmth * row.B[6];
-							contact.bodyB.impulse[1] += warmth * row.B[7];
-							contact.bodyB.impulse[2] += warmth * row.B[8];
-
-							contact.bodyB.impulse[3] += warmth * row.B[9];
-							contact.bodyB.impulse[4] += warmth * row.B[10];
-							contact.bodyB.impulse[5] += warmth * row.B[11];
-						}
-
-
-
-					}
+					// contact.appliedImpulse = 0;
+					contact.appliedPushImpulse = 0;
 				}
 			}
-			*/
 
 			for (var uid in physique.bodies) {
 				var body = physique.bodies[uid];
 				body.deltaV.multiplyScalar(0);
 				body.deltaW.multiplyScalar(0);
-
-				// FIXME: reset these???
-				// body.velocity.multiplyScalar(0);
-				// body.angularVelocity.multiplyScalar(0);
-				// body.notReset = true;
 			}
 
 
@@ -1309,101 +1348,124 @@ define(function(){
 					// FIXME: reset appliedImpulse ??
 					var contact = manifold.contacts[contactID],
 						row = contact.rows[0];
-					contact.appliedImpulse = 0;
-
-					if (contact.bodyA.notReset) {
-						contact.bodyA.velocity.multiplyScalar(0);
-						contact.bodyA.angularVelocity.multiplyScalar(0);
-						contact.bodyA.notReset = false;
-					}
-					if (contact.bodyB.notReset) {
-						contact.bodyB.velocity.multiplyScalar(0);
-						contact.bodyB.angularVelocity.multiplyScalar(0);
-						contact.bodyB.notReset = false;
-					}
-
-					var delta = contact.depth - contact.appliedPushImpulse,
-						deltaV1Dotn = contact.normal.dot( contact.bodyA.velocity ) + contact.tangent.dot( contact.bodyA.angularVelocity ),
-						deltaV2Dotn = contact.normal.clone().negate().dot( contact.bodyB.velocity ) + contact.tangent2.dot( contact.bodyB.angularVelocity );
-
-					delta -= deltaV1Dotn * contact.JDiagABInv;
-					delta -= deltaV2Dotn * contact.JDiagABInv;
-
-					var sum = contact.appliedPushImpulse + delta;
-					if (sum < 0) {
-						delta = -contact.appliedPushImpulse;
-						contact.appliedPushImpulse = 0;
-					} else {
-						contact.appliedPushImpulse = sum;
-					}
-
-					// FIXME: apply velocities independently from contacts?
-					contact.bodyA.newVelocity.add( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * delta) );
-					contact.bodyA.newAngularVelocity.add( contact.tangent.clone().multiplyScalar(contact.bodyA.invInertiaTensor * delta) );
-
-					contact.bodyB.newVelocity.add( contact.normal.clone().negate().multiplyScalar(contact.bodyB.invMass * delta) );
-					contact.bodyB.newAngularVelocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor * delta) );
-					// contact.bodyA.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * delta) );
-					// contact.bodyA.angularVelocity.add( contact.tangent.clone().multiplyScalar(contact.bodyA.invInertiaTensor * delta) );
-
-					// contact.bodyB.velocity.add( contact.normal.clone().negate().multiplyScalar(contact.bodyB.invMass * delta) );
-					// contact.bodyB.angularVelocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor * delta) );
-
-					// contact.bodyA.velocity.copy(contact.bodyA.newVelocity);
-					// contact.bodyA.angularVelocity.copy(contact.bodyA.newAngularVelocity);
-					// contact.bodyB.velocity.copy(contact.bodyB.newVelocity);
-					// contact.bodyB.angularVelocity.copy(contact.bodyB.newAngularVelocity);
 
 
+					// contact.appliedImpulse = 0;
 
 
+					for (var iteration=0; iteration<1; ++iteration) {
+						var delta = contact.depth - contact.appliedPushImpulse, // FIXME: appliedPushImpulse
+							deltaV1Dotn = contact.normal.dot( contact.bodyA.velocity ) + TEST_T1Factor * contact.tangent.dot( contact.bodyA.angularVelocity ),
+							deltaV2Dotn = contact.normal.clone().negate().dot( contact.bodyB.velocity ) + TEST_T2Factor * contact.tangent2.dot( contact.bodyB.angularVelocity );
+
+						delta -= deltaV1Dotn * contact.JDiagABInv;
+						delta -= deltaV2Dotn * contact.JDiagABInv;
+
+						var sum = contact.appliedPushImpulse + delta; // FIXME: appliedPushImpulse
+						if (sum < 0) {
+							delta = -contact.appliedPushImpulse; // FIXME: appliedPushImpulse
+							contact.appliedPushImpulse = 0; // FIXME: appliedPushImpulse
+							break;
+						} else {
+							contact.appliedPushImpulse = sum; // FIXME: appliedPushImpulse
+						}
+
+						contact.bodyA.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * delta) );
 
 
-					contact.appliedImpulse = 0;
-					contact.appliedPushImpulse = 0;
+						// var v = contact.tangent.clone().multiplyScalar(-contact.bodyA.invInertiaTensor * delta),
+						// 	e = (new THREE.Euler()).setFromVector3(v),
+						// 	q = (new THREE.Quaternion()).setFromEuler(e);
+						// contact.bodyA.angularVelocity.applyQuaternion(q);
+						contact.bodyA.angularVelocity.add( contact.tangent.clone().multiplyScalar(contact.bodyA.invInertiaTensor * delta) );
 
-					var rel_vel = 0.0;
+						contact.bodyB.velocity.add( contact.normal.clone().negate().multiplyScalar(contact.bodyB.invMass * delta) );
+						// v = contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor * delta);
+						// e = (new THREE.Euler()).setFromVector3(v);
+						// q = (new THREE.Quaternion()).setFromEuler(e);
+						// contact.bodyB.angularVelocity.applyQuaternion(q);
+						contact.bodyB.angularVelocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor * delta) );
 
-					if (contact.bodyA && contact.bodyA.invMass !== 0) {
-						// rel_vel += contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross( contact.vertexA.clone().sub(contact.bodyA.position) ) ).dot( contact.normal );
-						rel_vel += contact.normal.dot(contact.bodyA.velocity) + contact.tangent.dot(contact.bodyA.angularVelocity);
-					}
-
-					if (contact.bodyB && contact.bodyB.invMass !== 0) {
-						// rel_vel += contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross( contact.vertexB.clone().sub(contact.bodyB.position) ) ).dot( contact.normal.clone().negate() );
-						rel_vel += contact.normal.clone().negate().dot(contact.bodyB.velocity) + contact.tangent2.dot(contact.bodyB.angularVelocity);
 					}
 
 
-					var baumgarte = 0.8,
-						damping = 0.4,
-						restitution = 0.0;
 
-					var positionalError = 0.0,
-						velocityError = restitution - -rel_vel * damping;
+					// FIXME: warmstarting!?
+					contact.appliedImpulse *= 0.85;
 
-					positionalError = (contact.depth + 0.01) * baumgarte / dt;
+					contact.bodyA.applyImpulse( contact.normal.clone().multiplyScalar(contact.bodyA.invMass), contact.tangent.clone().multiplyScalar(-contact.bodyA.invInertiaTensor), contact.appliedImpulse );
+					contact.bodyB.applyImpulse( contact.normal.clone().multiplyScalar(contact.bodyB.invMass), contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor), contact.appliedImpulse );
 
-					var penetrationImpulse = positionalError * contact.JDiagABInv,
-						velocityImpulse = velocityError * contact.JDiagABInv;
 
-					contact.rhs = penetrationImpulse + velocityImpulse;
+
+
+
+					// contact.appliedImpulse = 0;
+					// contact.appliedPushImpulse = 0;
+
+					// var rel_vel = 0.0;
+
+					// if (contact.bodyA && contact.bodyA.invMass !== 0) {
+					// 	// rel_vel += contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross( contact.vertexA.clone().sub(contact.bodyA.position) ) ).dot( contact.normal );
+					// 	rel_vel += contact.normal.dot(contact.bodyA.velocity) + contact.tangent.dot(contact.bodyA.angularVelocity);
+					// }
+
+					// if (contact.bodyB && contact.bodyB.invMass !== 0) {
+					// 	// rel_vel += contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross( contact.vertexB.clone().sub(contact.bodyB.position) ) ).dot( contact.normal.clone().negate() );
+					// 	rel_vel += contact.normal.clone().negate().dot(contact.bodyB.velocity) - contact.tangent2.dot(contact.bodyB.angularVelocity);
+					// }
+
+
+					var baumgarte = -0.2, // FIXME: wth to do with this?!
+						restitution = 0.00; // FIXME: wth to do with this?!
+
+					// var positionalError = 0.0,
+					// 	velocityError = restitution * -rel_vel - rel_vel * physique.world.damping;
+
+					// positionalError =  (contact.depth + physique.world.slop) * baumgarte / dt;
+
+					// var penetrationImpulse = positionalError * contact.JDiagABInv,
+					// 	velocityImpulse = velocityError * contact.JDiagABInv;
+
+					// contact.rhs = penetrationImpulse + velocityImpulse; // FIXME: bullet way
+					// contact.rhs = (contact.normal.clone().add(contact.bodyA.angularVelocity.clone().cross(contact.vertexA)).dot(contact.vertexA)) * restitution; // FIXME: goblin way
+					var JDotV = 0;
+					JDotV += row.J[0] * contact.bodyA.velocity.x;
+					JDotV += row.J[1] * contact.bodyA.velocity.y;
+					JDotV += row.J[2] * contact.bodyA.velocity.z;
+					JDotV += row.J[3] * contact.bodyA.angularVelocity.x;
+					JDotV += row.J[4] * contact.bodyA.angularVelocity.y;
+					JDotV += row.J[5] * contact.bodyA.angularVelocity.z;
+
+					JDotV += row.J[6]  * contact.bodyB.velocity.x;
+					JDotV += row.J[7]  * contact.bodyB.velocity.y;
+					JDotV += row.J[8]  * contact.bodyB.velocity.z;
+					JDotV += row.J[9]  * contact.bodyB.angularVelocity.x;
+					JDotV += row.J[10] * contact.bodyB.angularVelocity.y;
+					JDotV += row.J[11] * contact.bodyB.angularVelocity.z;
+					var idt = 1/dt;
+					var C = JDotV,
+						JDotVTerm = 0,
+						Fext = new THREE.Vector3(0, -9.8, 0),
+						Text = new THREE.Vector3(0, 0, 0);
+					JDotVTerm += row.J[0] * (contact.bodyA.velocity.x / idt + contact.bodyA.invMass * Fext.x);
+					JDotVTerm += row.J[1] * (contact.bodyA.velocity.y / idt + contact.bodyA.invMass * Fext.y);
+					JDotVTerm += row.J[2] * (contact.bodyA.velocity.z / idt + contact.bodyA.invMass * Fext.z);
+					JDotVTerm += row.J[3] * (contact.bodyA.angularVelocity.x / idt + contact.bodyA.invMass * Text.x);
+					JDotVTerm += row.J[4] * (contact.bodyA.angularVelocity.y / idt + contact.bodyA.invMass * Text.y);
+					JDotVTerm += row.J[5] * (contact.bodyA.angularVelocity.z / idt + contact.bodyA.invMass * Text.z);
+
+					JDotVTerm += row.J[6]  * (contact.bodyB.velocity.x / idt + contact.bodyB.invMass * Fext.x);
+					JDotVTerm += row.J[7]  * (contact.bodyB.velocity.y / idt + contact.bodyB.invMass * Fext.y);
+					JDotVTerm += row.J[8]  * (contact.bodyB.velocity.z / idt + contact.bodyB.invMass * Fext.z);
+					JDotVTerm += row.J[9]  * (contact.bodyB.angularVelocity.x / idt + contact.bodyB.invMass * Text.x);
+					JDotVTerm += row.J[10] * (contact.bodyB.angularVelocity.y / idt + contact.bodyB.invMass * Text.y);
+					JDotVTerm += row.J[11] * (contact.bodyB.angularVelocity.z / idt + contact.bodyB.invMass * Text.z);
+
+
+					contact.rhs = baumgarte*C/idt - restitution*JDotVTerm; // FIXME: Erin Catto GDC2005 way
 
 				}
-			}
-
-			for (var uid in physique.bodies) {
-				var body = physique.bodies[uid];
-
-				// FIXME: copy new velocities?
-				// body.velocity.copy(body.newVelocity);
-				// body.angularVelocity.copy(body.newAngularVelocity);
-
-				body.velocity.add(body.newVelocity);
-				body.angularVelocity.add(body.newAngularVelocity);
-
-				body.newVelocity.multiplyScalar(0);
-				body.newAngularVelocity.multiplyScalar(0);
 			}
 
 
@@ -1420,8 +1482,8 @@ define(function(){
 							JdotV = 0,
 							delta = 0;
 
-						// FIXME: baumgarte stabilization
-						// var b = 0.2 * contact.depth / dt; 
+
+						/* NOTE: bullet way
 						delta = contact.rhs - contact.appliedImpulse;
 
 						// FIXME: tangent contactOnNormalB? reset applied impulse? reset velocities? JDiagABInv, invInertiaTensor
@@ -1430,6 +1492,22 @@ define(function(){
 							dV2Dotn = contact.normal.clone().negate().dot(contact.bodyB.deltaV) + contact.tangent2.dot(contact.bodyB.deltaW);
 
 						delta += -(dV1Dotn * contact.JDiagABInv + dV2Dotn * contact.JDiagABInv);
+						*/
+
+						// Erin Catto GDC-2005 way
+						// a = B*lambda
+						var d = row.D,
+							JDotA = 0,
+							a = [];
+
+						for (var ji=0; ji<12; ++ji) {
+							a[ji] = row.B[ji] * contact.appliedImpulse;
+							JDotA += row.J[ji] * a[ji];
+						}
+						delta = (contact.rhs - JDotA) / d;
+
+
+
 						var sum = contact.appliedImpulse + delta;
 						if (sum < 0) {
 							delta = -contact.appliedImpulse;
@@ -1439,147 +1517,17 @@ define(function(){
 							contact.appliedImpulse = sum;
 						}
 
+						// if (Math.abs(delta) < 0.0001) break; // Breaking impulse
+
 						contact.bodyA.applyImpulse(contact.normal.clone().multiplyScalar(contact.bodyA.invMass), contact.tangent.clone().multiplyScalar(contact.bodyA.invInertiaTensor), delta);
 						contact.bodyB.applyImpulse(contact.normal.clone().multiplyScalar(-contact.bodyB.invMass), contact.tangent2.clone().multiplyScalar(contact.bodyB.invInertiaTensor), delta);
 
 
-						/*
-						if (contact.bodyA && contact.bodyA.invMass !== 0) {
-							JdotV += row.J[0] * contact.bodyA.impulse[0];// * contact.bodyA.velocity.x;
-							JdotV += row.J[1] * contact.bodyA.impulse[1];// * contact.bodyA.velocity.y;
-							JdotV += row.J[2] * contact.bodyA.impulse[2];// * contact.bodyA.velocity.z;
-							JdotV += row.J[3] * contact.bodyA.impulse[3];// * contact.bodyA.angularVelocity.x;
-							JdotV += row.J[4] * contact.bodyA.impulse[4];// * contact.bodyA.angularVelocity.y;
-							JdotV += row.J[5] * contact.bodyA.impulse[5];// * contact.bodyA.angularVelocity.z;
-						}
-
-						if (contact.bodyB && contact.bodyB.invMass !== 0) {
-							JdotV += row.J[6]  * contact.bodyB.impulse[6];//  * contact.bodyB.velocity.x;
-							JdotV += row.J[7]  * contact.bodyB.impulse[7];//  * contact.bodyB.velocity.y;
-							JdotV += row.J[8]  * contact.bodyB.impulse[8];//  * contact.bodyB.velocity.z;
-							JdotV += row.J[9]  * contact.bodyB.impulse[9];//  * contact.bodyB.angularVelocity.x;
-							JdotV += row.J[10] * contact.bodyB.impulse[10];// * contact.bodyB.angularVelocity.y;
-							JdotV += row.J[11] * contact.bodyB.impulse[11];// * contact.bodyB.angularVelocity.z;
-						}
-
-						var deltaLagrange = (-row.JdotV - JdotV) / row.D,
-							oldLagrange = row.lagrange;
-						// FIXME: successive over-relaxation
-						var multiplier_target = 0.85 * (oldLagrange + deltaLagrange) + ( 1 - 0.85 ) * oldLagrange;
-						multiplier_target = Math.min(multiplier_target, 20); // FIXME
-						row.lagrange = Math.max(0, multiplier_target);
-						deltaLagrange = row.lagrange - oldLagrange;
-						*/
-
-						/*
-						if (contact.bodyA && contact.bodyA.invMass !== 0) {
-							contact.bodyA.velocity.x += deltaLagrange * row.B[0];
-							contact.bodyA.velocity.y += deltaLagrange * row.B[1];
-							contact.bodyA.velocity.z += deltaLagrange * row.B[2];
-							contact.bodyA.angularVelocity.x += deltaLagrange * row.B[3];
-							contact.bodyA.angularVelocity.y += deltaLagrange * row.B[4];
-							contact.bodyA.angularVelocity.z += deltaLagrange * row.B[5];
-						}
-
-						if (contact.bodyB && contact.bodyB.invMass !== 0) {
-							contact.bodyB.velocity.x += deltaLagrange * row.B[6];
-							contact.bodyB.velocity.y += deltaLagrange * row.B[7];
-							contact.bodyB.velocity.z += deltaLagrange * row.B[8];
-							contact.bodyB.angularVelocity.x += deltaLagrange * row.B[9];
-							contact.bodyB.angularVelocity.y += deltaLagrange * row.B[10];
-							contact.bodyB.angularVelocity.z += deltaLagrange * row.B[11];
-						}
-
-
-						if (contact.bodyA && contact.bodyA.invMass !== 0) {
-							contact.bodyA.impulse[0] += deltaLagrange * row.B[0];
-							contact.bodyA.impulse[1] += deltaLagrange * row.B[1];
-							contact.bodyA.impulse[2] += deltaLagrange * row.B[2];
-
-							contact.bodyA.impulse[3] += deltaLagrange * row.B[3];
-							contact.bodyA.impulse[4] += deltaLagrange * row.B[4];
-							contact.bodyA.impulse[5] += deltaLagrange * row.B[5];
-						}
-
-						if (contact.bodyB && contact.bodyA.invMass !== 0) {
-							contact.bodyB.impulse[0] += deltaLagrange * row.B[6];
-							contact.bodyB.impulse[1] += deltaLagrange * row.B[7];
-							contact.bodyB.impulse[2] += deltaLagrange * row.B[8];
-
-							contact.bodyB.impulse[3] += deltaLagrange * row.B[9];
-							contact.bodyB.impulse[4] += deltaLagrange * row.B[10];
-							contact.bodyB.impulse[5] += deltaLagrange * row.B[11];
-						}
-
-
-
-						// Last one
-						if (iteration+1 == collisionResIterations) {
-							var relax = 0.0;
-							if (contact.bodyA && contact.bodyA.invMass !== 0) {
-								contact.bodyA.position.add( new THREE.Vector3(
-										contact.bodyA.invMass * row.J[0] * relax * row.lagrange,
-										contact.bodyA.invMass * row.J[1] * relax * row.lagrange,
-										contact.bodyA.invMass * row.J[2] * relax * row.lagrange ) );
-
-								var v = (new THREE.Vector3(contact.bodyA.invMass * row.J[3] * relax * row.lagrange,
-														   -contact.bodyA.invMass * row.J[4] * relax * row.lagrange,
-														   contact.bodyA.invMass * row.J[5] * relax * row.lagrange)),
-									e = (new THREE.Euler()).setFromVector3(v),
-									q = (new THREE.Quaternion()).setFromEuler(e);
-								contact.bodyA.quaternion.multiply(q);
-
-							}
-
-						}
-						*/
 
 					}
 				}
 			}
 
-			/*
-			// Apply impulse
-			for (var manifoldID in contactManifolds) {
-
-				var manifold = contactManifolds[manifoldID];
-				for (var contactID in manifold.contacts) {
-
-					var contact = manifold.contacts[contactID];
-					for (var iRow=0; iRow<contact.rows.length; ++iRow) {
-
-						var row = contact.rows[iRow];
-
-						if (contact.bodyA && contact.bodyA.invMass !== 0) {
-							contact.bodyA.velocity.add( new THREE.Vector3(
-									contact.bodyA.invMass * dt * row.J[0] * row.lagrange,
-									contact.bodyA.invMass * dt * row.J[1] * row.lagrange,
-									contact.bodyA.invMass * dt * row.J[2] * row.lagrange ) );
-
-							contact.bodyA.angularVelocity.add( new THREE.Vector3(
-									contact.bodyA.invMass * dt * row.J[3] * row.lagrange,
-									contact.bodyA.invMass * dt * row.J[4] * row.lagrange,
-									contact.bodyA.invMass * dt * row.J[5] * row.lagrange ) );
-						}
-
-						if (contact.bodyB && contact.bodyB.invMass !== 0) {
-							contact.bodyB.velocity.add( new THREE.Vector3(
-									contact.bodyB.invMass * dt * row.J[6] * row.lagrange,
-									contact.bodyB.invMass * dt * row.J[7] * row.lagrange,
-									contact.bodyB.invMass * dt * row.J[8] * row.lagrange ) );
-
-							contact.bodyB.angularVelocity.add( new THREE.Vector3(
-									contact.bodyB.invMass * dt * row.J[9] * row.lagrange,
-									contact.bodyB.invMass * dt * row.J[10] * row.lagrange,
-									contact.bodyB.invMass * dt * row.J[11] * row.lagrange ) );
-						}
-
-
-
-					}
-				}
-			}
-			*/
 		};
 
 
@@ -1599,8 +1547,8 @@ define(function(){
 			var bodyType = mesh.settings.body;
 			if (bodyType === BODY_CUBE) {
 
-				mesh.body.invMass = 1 / (1.0);
-				mesh.body.invInertiaTensor = 1 / (1.0);
+				mesh.body.invMass = 1 / (mass);
+				mesh.body.invInertiaTensor = 1 / (inertia);
 				mesh.body.velocity = new THREE.Vector3();
 				mesh.body.angularVelocity = new THREE.Vector3();
 				mesh.body.impulse = [0,0,0,0,0,0]
@@ -1630,6 +1578,27 @@ define(function(){
 
 				// this.velocity.add( linear.clone().multiplyScalar(impulseMagnitude) );
 				// this.angularVelocity.add( angular.clone().multiplyScalar(impulseMagnitude) );
+			};
+			mesh.body.updateRotation = function(dt){
+
+
+				// Update rotation
+				var q = new THREE.Quaternion(
+					this.angularVelocity.x * dt,
+					this.angularVelocity.y * dt,
+					this.angularVelocity.z * dt,
+					0
+				);
+
+				q.multiply( this.quaternion );
+
+				var half_dt = 0.5;
+				this.quaternion.x += half_dt * q.x;
+				this.quaternion.y += half_dt * q.y;
+				this.quaternion.z += half_dt * q.z;
+				this.quaternion.w += half_dt * q.w;
+				this.quaternion.normalize();
+
 			};
 
 			this.addBodyIntoBroadphase(mesh.body);
@@ -1692,7 +1661,6 @@ define(function(){
 						position: body.position.clone()
 					};
 
-					body.velocity.y += (this.world.gravity / body.invMass * dt);
 
 					var scale = 1.0;
 					body.position.x += scale * body.velocity.x * dt;
@@ -1704,6 +1672,7 @@ define(function(){
 						q = (new THREE.Quaternion()).setFromEuler(e);
 					body.quaternion.multiply(q);
 
+					body.velocity.y += (this.world.gravity / body.invMass * dt);
 
 					this.updateAABB(body);
 					this.updateBodyInBroadphase(body);
@@ -1779,6 +1748,7 @@ define(function(){
 			if (oldHits) {
 				for (var oldHitHash in oldHits) {
 					if (!hits.hasOwnProperty(oldHitHash)) {
+						this.removeManifold(oldHitHash);
 						var oldHit = oldHits[oldHitHash],
 							bodyA = oldHit.bodyA,
 							bodyB = oldHit.bodyB;
@@ -1807,16 +1777,17 @@ define(function(){
 			for (var uid in this.bodies) {
 				var body = this.bodies[uid];
 
-				if (body.hasOwnProperty('storedState')) {
-					body.position.copy(body.storedState.position);
-					delete body.storedState;
-				}
+				// if (body.hasOwnProperty('storedState')) {
+				// 	body.position.copy(body.storedState.position);
+				// 	delete body.storedState;
+				// }
 
 				if (body.active) {
 
 					body.velocity.add(body.deltaV);
 					body.angularVelocity.add(body.deltaW);
 
+					/*
 					var scale = 1.0;
 					body.position.x += scale * body.velocity.x * dt;
 					body.position.y += scale * body.velocity.y * dt;
@@ -1826,9 +1797,30 @@ define(function(){
 						e = (new THREE.Euler()).setFromVector3(v),
 						q = (new THREE.Quaternion()).setFromEuler(e);
 					body.quaternion.multiply(q);
+					// body.rotation.x += v.x;
+					// body.rotation.y += v.y;
+					// body.rotation.z += v.z;
+					*/
 
-					body.velocity.multiplyScalar(0.8);
-					body.angularVelocity.multiplyScalar(0.8);
+					// body.updateRotation(dt);
+					// body.angularVelocity.multiplyScalar(0);
+
+					var damping = physique.world.damping;
+					body.velocity.multiplyScalar(damping);
+					body.angularVelocity.multiplyScalar(damping);
+
+					// var epsV = 0;
+					// if (Math.abs(body.velocity.x) < epsV) body.velocity.x = 0;
+					// if (Math.abs(body.velocity.y) < epsV) body.velocity.y = 0;
+					// if (Math.abs(body.velocity.z) < epsV) body.velocity.z = 0;
+					// if (Math.abs(body.angularVelocity.x) < epsV) body.angularVelocity.x = 0;
+					// if (Math.abs(body.angularVelocity.y) < epsV) body.angularVelocity.y = 0;
+					// if (Math.abs(body.angularVelocity.z) < epsV) body.angularVelocity.z = 0;
+
+					body.deltaV.multiplyScalar(0);
+					body.deltaW.multiplyScalar(0);
+					// body.deltaV.multiplyScalar(damping);
+					// body.deltaW.multiplyScalar(damping);
 
 					this.updateAABB(body);
 					this.updateBodyInBroadphase(body);

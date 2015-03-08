@@ -15,14 +15,23 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 						height: window.innerHeight
 					}
 				}
-			}
+			},
+
+			isGoblin: false,
+			twoObjects: true
 	};
 
 	scene = new Scene();
 	renderer = new Renderer({
 		settings: Settings.rendering
 	});
-	physique = new Physique();
+
+	if (Settings.isGoblin) {
+		world = new Goblin.World( new Goblin.BasicBroadphase(), new Goblin.NarrowPhase(), new Goblin.IterativeSolver() );
+	} else {
+		physique = new Physique();
+	}
+
 	raycaster = new THREE.Raycaster();
 
 	var update     = null,
@@ -37,10 +46,28 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 		mesh.bodyType = BODY_CUBE;
 
-		physique.addBody(_mesh);
+		if (Settings.isGoblin) {
+			if (_mesh.settings.body === BODY_FLOOR) {
+				mesh.goblin = new Goblin.RigidBody( new Goblin.BoxShape( 20, 2.5, 20 ), 0 );
+			} else {
+				mesh.goblin = new Goblin.RigidBody( new Goblin.BoxShape( 0.5, 0.5, 0.5 ), 1 );
+			}
+			world.addRigidBody( mesh.goblin );
+			mesh.goblin.position.x = mesh.position.x;
+			mesh.goblin.position.y = mesh.position.y;
+			mesh.goblin.position.z = mesh.position.z;
+			mesh.goblin.rotation.x = mesh.rotation._x;
+			mesh.goblin.rotation.y = mesh.rotation._y;
+			mesh.goblin.rotation.z = mesh.rotation._z;
+		} else {
+			physique.addBody(_mesh);
+		}
 
 		$('#objects').append( $('<option/>').attr('value', _mesh.uid) );
 	};
+
+
+	if (!Settings.isGoblin) {
 
 	var debugArrows = {};
 	physique.onDebugHelperArrow = function(hitHash, dir, origin, depth){
@@ -51,11 +78,6 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			debugArrows[hitHash] = {
 				mesh: mesh
 			};
-			/*
-			mesh.position = origin;
-			mesh.setDirection(dir);
-			mesh.setLength(depth);
-			*/
 		} else {
 			var mesh = renderer.addArrow(dir, origin, depth);
 			debugArrows[hitHash] = {
@@ -83,9 +105,11 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		delete debugContacts[hash];
 	};
 
+	}
+
 	$('#objectsInput').on('input', function(){
 		var meshID = $(this).val();
-		activeMesh = scene.meshes[meshID];
+		activeMesh = scene.meshes[meshID].body;
 			$(this).blur();
 			// $(this).focusout();
 			// $(this).trigger('blur');
@@ -98,7 +122,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 			delta /= 100;
 			$(this).data('oldVal', rotation);
-			activeMesh.body.rotateX(delta);
+			activeMesh.rotateX(delta);
 		}
 	}).data('oldVal', 0);
 
@@ -109,7 +133,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 			delta /= 100;
 			$(this).data('oldVal', rotation);
-			activeMesh.body.rotateY(delta);
+			activeMesh.rotateY(delta);
 		}
 	}).data('oldVal', 0);
 
@@ -120,18 +144,18 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 			delta /= 100;
 			$(this).data('oldVal', rotation);
-			activeMesh.body.rotateZ(delta);
+			activeMesh.rotateZ(delta);
 		}
 	}).data('oldVal', 0);
 
 	var isMoving = false,
-		moveScale = 0.1,
-		MOVE_UP = 1<<0,
-		MOVE_DOWN = 1<<1,
-		MOVE_LEFT = 1<<2,
-		MOVE_RIGHT = 1<<3,
-		MOVE_FORWARD = 1<<4,
-		MOVE_BACKWARD = 1<<5;
+		moveScale = 0.2,
+		MOVE_UP = 1<<5,
+		MOVE_DOWN = 1<<6,
+		MOVE_LEFT = 1<<3,
+		MOVE_RIGHT = 1<<4,
+		MOVE_FORWARD = 1<<1,
+		MOVE_BACKWARD = 1<<2;
 
 	renderer.startup().then(function(renderObj){
 		canvas = renderObj.domElement;
@@ -143,16 +167,18 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			position: new THREE.Vector3(0, 0, 0)
 		});
 
-		// scene.addMesh({
-		// 	type: MESH_BOX,
-		// 	body: BODY_CUBE,
-		// 	position: new THREE.Vector3(0, 4, 0)
-		// });
+		if (Settings.twoObjects) {
+		scene.addMesh({
+			type: MESH_BOX,
+			body: BODY_CUBE,
+			position: new THREE.Vector3(0, 4, 0)
+		});
+		}
 
 		scene.addMesh({
 			type: MESH_PLANE,
 			body: BODY_FLOOR,
-			position: new THREE.Vector3(0, -2, 10)
+			position: new THREE.Vector3(0, -4, 10)
 		});
 
 
@@ -191,6 +217,10 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			}
 		});
 
+		document.addEventListener('mouseup', function MouseUpEvent(evt){
+			activeMesh = null;
+		});
+
 
 
 		startup();
@@ -206,11 +236,30 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		if (isMoving & MOVE_BACKWARD) moveDir.z -= 1;
 		if (isMoving & MOVE_LEFT)     moveDir.x += 1;
 		if (isMoving & MOVE_RIGHT)    moveDir.x -= 1;
-		if (isMoving & MOVE_UP)       moveDir.y += 1;
-		if (isMoving & MOVE_DOWN)     moveDir.y -= 1;
+		if (isMoving & MOVE_UP)       moveDir.y -= 1;
+		if (isMoving & MOVE_DOWN)     moveDir.y += 1;
 
-		moveDir.multiplyScalar(moveScale);
-		activeMesh.body.position.add(moveDir);
+
+			var qX = new THREE.Quaternion(),
+				qY = new THREE.Quaternion(),
+				qZ = new THREE.Quaternion(),
+				m = new THREE.Matrix4(),
+				vY = new THREE.Vector3(0,1,0),
+				vX = new THREE.Vector3(1,0,0),
+				vZ = new THREE.Vector3(0,0,1);
+
+			qX.setFromAxisAngle( vY, -renderer.camera.phi );
+			vX.applyQuaternion(qX);
+			qY.setFromAxisAngle( vX, -renderer.camera.theta );
+			vY.multiply(qY);
+			qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
+			qY.multiply(qX);
+			qY.multiply(qZ);
+
+			moveDir.applyQuaternion(qY);
+
+		moveDir.multiplyScalar(-moveScale);
+		activeMesh.position.add(moveDir);
 	};
 
 	update = function(){
@@ -222,14 +271,26 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		while (deltaTime > 0) {
 			var delta = Math.min(50, deltaTime);
 
+			isMoving = Input.UI.viewport.isMoving;
 			if (isMoving && activeMesh) {
 				moveMesh(delta);
 			}
 
-			physique.step(delta);
+			if (Settings.isGoblin) {
+				world.step(1/60);
+				// Goblin sync
+				for (var meshID in scene.meshes){
+					var mesh = scene.meshes[meshID];
+					mesh.body.position.copy(mesh.body.goblin.position);
+					mesh.body.rotation.copy(new THREE.Euler(mesh.body.goblin.rotation.x, mesh.body.goblin.rotation.y, mesh.body.goblin.rotation.z));
+				}
+			} else {
+				physique.step(delta);
+			}
 			renderer.render();
 			Input.step(delta);
 			deltaTime -= delta;
+
 
 			if (raycaster.active && raycaster.hasUpdated) {
 				raycaster.setFromCamera( raycaster.mouse, renderer.camera );
