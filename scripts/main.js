@@ -21,6 +21,18 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			twoObjects: true
 	};
 
+	THREE.Euler.prototype.sub = function(vec){
+		this.x -= vec.x;
+		this.y -= vec.y;
+		this.z -= vec.z;
+	};
+
+	THREE.Euler.prototype.add = function(vec){
+		this.x += vec.x;
+		this.y += vec.y;
+		this.z += vec.z;
+	};
+
 	scene = new Scene();
 	renderer = new Renderer({
 		settings: Settings.rendering
@@ -221,6 +233,16 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			activeMesh = null;
 		});
 
+		$('#startPhysics').click(function(){
+			physique.world.scaleTime = 0.001;
+			return false;
+		});
+
+		$('#stopPhysics').click(function(){
+			physique.world.scaleTime = 0.0;
+			return false;
+		});
+
 
 
 		startup();
@@ -303,6 +325,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 							activeMesh.distanceFromCamera = intersect.distance;
 							raycaster.holdingOnto = activeMesh;
 							activeMesh.velocity.multiplyScalar(0.0);
+							activeMesh.angularVelocity.multiplyScalar(0.0);
 							raycaster.holdingOnto.active = false;
 							break;
 						}
