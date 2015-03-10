@@ -18,7 +18,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			},
 
 			isGoblin: false,
-			twoObjects: true
+			twoObjects: true,
+			moreObjects: 2
 	};
 
 	THREE.Euler.prototype.sub = function(vec){
@@ -100,7 +101,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 	var debugContacts = {};
 	physique.onNewContact = function(hash, point){
-		var mesh = renderer.addContact(point);
+		var Bpoint = (hash[hash.length-1]=='B');
+		var mesh = renderer.addContact(point, Bpoint);
 		debugContacts[hash] = {
 			mesh: mesh
 		};
@@ -180,11 +182,23 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		});
 
 		if (Settings.twoObjects) {
-		scene.addMesh({
-			type: MESH_BOX,
-			body: BODY_CUBE,
-			position: new THREE.Vector3(0, 4, 0)
-		});
+			scene.addMesh({
+				type: MESH_BOX,
+				body: BODY_CUBE,
+				position: new THREE.Vector3(0, 1.5, 0)
+			});
+
+			if (Settings.moreObjects) {
+				var offsetY = 1.5;
+				for (var i=2; i<Settings.moreObjects; ++i) {
+					offsetY += 1.5;
+					scene.addMesh({
+						type: MESH_BOX,
+						body: BODY_CUBE,
+						position: new THREE.Vector3(0, offsetY, 0)
+					});
+				}
+			}
 		}
 
 		scene.addMesh({

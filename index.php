@@ -41,15 +41,14 @@
 				- BUG: sometimes hits infinite loop (redundant vertices added from support point)
 			- report contact manifold
 		* CR
-			- Angular velocity
+			- bodyB contact!
 			- restitution?
 			- baumgarte?
-			- pre-sequential solvers?
+			- pre-sequential solvers? split penetration/velocity?
 			- friction
 			- slop
-			- FIX contact.tangent and contact.tangent2 (EVERYTHING that uses them needs to have the correct sign)
 
-			- BUG: resting contact
+			- BUG: box over the edge; two boxes colliding: this is a problem with bodyB clearly
 			- BUG: box sometimes slips
 
 			- check if point is colliding: check against normal of every face

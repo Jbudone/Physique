@@ -138,10 +138,10 @@ define(function(){
 			});
 		};
 
-		this.addContact = function(point){
+		this.addContact = function(point, Bpoint){
 
-			var geometry = new THREE.SphereGeometry( 0.1, 32, 32 ),
-				material = new THREE.MeshBasicMaterial( {color: 0xffff00} ),
+			var geometry = new THREE.SphereGeometry( 0.05, 32, 32 ),
+				material = new THREE.MeshBasicMaterial( {color: (Bpoint ? 0x00ffff : 0xffff00)} ),
 				sphere = new THREE.Mesh( geometry, material );
 			sphere.position.copy(point);
 			scene.add( sphere );
