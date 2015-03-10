@@ -41,17 +41,16 @@
 				- BUG: sometimes hits infinite loop (redundant vertices added from support point)
 			- report contact manifold
 		* CR
-			- bodyB contact!
 			- restitution?
 			- baumgarte?
 			- pre-sequential solvers? split penetration/velocity?
 			- friction
 			- slop
+			- warm start?
 
-			- BUG: box over the edge; two boxes colliding: this is a problem with bodyB clearly
+			- BUG: 2 boxes colliding results in them both knocking each other apart, and at least one of the boxes sinks slightly into the ground without ever coming back up..this is because of the sequential impulses which push the box up and then pushes it back down (contact.impulse - cached) < 0
 			- BUG: box sometimes slips
 
-			- check if point is colliding: check against normal of every face
 		* UI: edit clock
 			- edit clock
 			- keep track of snapshots of world; then step backwards in time (debug)

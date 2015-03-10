@@ -31,7 +31,7 @@ define(function(){
 			resetDeltas = true;
 
 		var mass = 0.2,
-			inertia = 0.2;
+			inertia = (1/3) * mass;
 
 		/*****************************************************************
 		 *****************************************************************
@@ -1658,23 +1658,45 @@ define(function(){
 						// 	pB = body2Tobody1.getInverse() * triangle->computeClosestPointOfObject(suppPointsB)
 						var rA = contact.vertexA.clone().sub(contact.bodyA.position),
 							rB = contact.vertexB.clone().sub(contact.bodyB.position),
-							deltaV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-						deltaV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+							dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
-						var deltaVDotN = -deltaV.dot(contact.normal),
+						var deltaVDotN = -dV.dot(contact.normal),
 							JV = deltaVDotN;
 
-						var b = (contact.depth - physique.world.slop) * (-0.4 * dt);// + JV * 0.25; // TODO: restitution
+						var b = (contact.depth - physique.world.slop) * (-0.4)// + JV * 0.25; // TODO: restitution
 
+						// var MA = new THREE.Vector3(), MB = new THREE.Vector3();
 						var MA = 0, MB = 0;
 						if (contact.bodyA.invMass !== 0) {
-							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MA = contact.bodyA.invMass + (contact.vertexA.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyA.invInertiaTensor)).cross(contact.vertexA).dot(contact.normal.clone().negate());
+							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (contact.vertexA.clone().cross(contact.normal.clone().negate())).cross(contact.vertexA).dot(contact.normal.clone().negate());
+							var mass = contact.bodyA.invMass,
+								iner = contact.bodyA.invInertiaTensor,
+								norm = contact.normal.clone().negate(),
+								tang = rA.clone().cross(norm);
+							// MA = norm.clone().multiplyScalar(mass);
+							// MA.add( rA.clone().cross(norm).multiplyScalar(iner).cross(rA) );
+							MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
+							MA += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
 						}
 						if (contact.bodyB.invMass !== 0) {
-							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MB = contact.bodyB.invMass + (contact.vertexB.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyB.invInertiaTensor)).cross(contact.vertexB).dot(contact.normal.clone().negate());
+							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (contact.vertexB.clone().cross(contact.normal.clone().negate())).cross(contact.vertexB).dot(contact.normal.clone().negate());
+							var mass = contact.bodyB.invMass,
+								iner = contact.bodyB.invInertiaTensor,
+								norm = contact.normal.clone().negate(),
+								tang = rB.clone().cross(norm);
+							// MB = norm.clone().multiplyScalar(-mass);
+							// MB.sub( rB.clone().cross(norm.clone().negate()).multiplyScalar(iner).cross(rB) );
+							MB = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
+							MB += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
 						}
-						var Meffective = 1 / (MA + MB);
-						var deltaLambda = -(JV + b) * Meffective,
+						// var Meffective = MA.add(MB).dot(contact.normal.clone().negate());// 1 / (MA + MB);
+						var Meffective =  (MA + MB);
+						var deltaLambda = -(JV + b) / Meffective,
 							lambdaTemp = contact.impulse;
 
 						contact.impulse = Math.max(contact.impulse + deltaLambda, 0.0);

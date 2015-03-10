@@ -18,7 +18,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			},
 
 			isGoblin: false,
-			twoObjects: true,
+			twoObjects: false,
 			moreObjects: 2
 	};
 
