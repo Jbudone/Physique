@@ -18,7 +18,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			},
 
 			isGoblin: false,
-			twoObjects: false,
+			twoObjects: true,
 			moreObjects: 2
 	};
 
@@ -247,13 +247,22 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			activeMesh = null;
 		});
 
+		var physiqueScale = physique.world.scaleTime;
 		$('#startPhysics').click(function(){
-			physique.world.scaleTime = 0.001;
+			physique.world.scaleTime = physiqueScale;
+			physique.world.runOnce = null;
 			return false;
 		});
 
 		$('#stopPhysics').click(function(){
 			physique.world.scaleTime = 0.0;
+			physique.world.runOnce = null;
+			return false;
+		});
+
+		$('#stepPhysics').click(function(){
+			physique.world.scaleTime = physiqueScale;
+			physique.world.runOnce = true;
 			return false;
 		});
 

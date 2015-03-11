@@ -12,13 +12,14 @@ define(function(){
 
 		this.world = {
 			gravity: -9.8,
-			scaleTime: 0.001,
+			scaleTime: 0.00001,
 
 			slop: 0,//0.001,
 			maxDepth: 4.0, // before falling through
 			damping: 1.00,
 
-			maxContactsInManifold: 4
+			maxContactsInManifold: 4,
+			runOnce: null
 		};
 
 		var TEST_ScaleT1 = 1,
@@ -30,7 +31,7 @@ define(function(){
 			TEST_NormTangent = true,
 			resetDeltas = true;
 
-		var mass = 0.2,
+		var mass = 2,
 			inertia = (1/3) * mass;
 
 		/*****************************************************************
@@ -1843,6 +1844,9 @@ define(function(){
 		this.step = function(delta){
 
 			dt = delta * this.world.scaleTime;
+			if (dt == 0) return;
+			if (this.world.runOnce === false) return;
+			if (this.world.runOnce === true) this.world.runOnce = false;
 			var angularScale = new THREE.Vector3(1, 1, 1);
 			for (var uid in this.bodies) {
 				var body = this.bodies[uid];

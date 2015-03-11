@@ -148,6 +148,7 @@
 
 				<div id="controls">
 					<a href="#" id="stopPhysics" style="margin-right: 100px;" class="button">STOP</a>
+					<a href="#" id="stepPhysics" style="margin-right: 100px;" class="button">STEP</a>
 					<a href="#" id="startPhysics" style="margin-right: 100px;" class="button">START</a>
 				</div>
 			</div>
