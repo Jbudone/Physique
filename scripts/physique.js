@@ -12,11 +12,15 @@ define(function(){
 
 		this.world = {
 			gravity: -9.8,
-			scaleTime: 0.00001,
+			scaleTime: 0.001,
 
-			slop: 0,//0.001,
+			slop: -0.001,
 			maxDepth: 4.0, // before falling through
 			damping: 1.00,
+			warmth: 0.9,
+			baumgarte: 0.4,
+			restitution: 0.25,
+			friction: 0.2, // sqrt( mu1 * mu2 )
 
 			maxContactsInManifold: 4,
 			runOnce: null
@@ -31,7 +35,7 @@ define(function(){
 			TEST_NormTangent = true,
 			resetDeltas = true;
 
-		var mass = 2,
+		var mass = 0.60,
 			inertia = (1/3) * mass;
 
 		/*****************************************************************
@@ -1027,15 +1031,26 @@ define(function(){
 			this.localB = contact.localB;
 			this.depth = contact.depth;
 
-			this.tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: using correct normal?
-			this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal );// FIXME: using correct normal
-
-			if (TEST_NormTangent) {
-				this.tangent.normalize();
-				this.tangent2.normalize();
+			// Find a tangential basis: http://box2d.org/2014/02/computing-a-basis/
+			if (Math.abs(this.normal.x) >= 0.57735) {
+				this.tangent1 = new THREE.Vector3( this.normal.y, -this.normal.x, 0.0 );
+			} else {
+				this.tangent1 = new THREE.Vector3( 0.0, this.normal.z, -this.normal.y );
 			}
+			this.tangent1.normalize();
+			this.tangent2 = new THREE.Vector3();
+			this.tangent2.copy(this.normal).cross(this.tangent1);
+			// this.tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: using correct normal?
+			// this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal );// FIXME: using correct normal
+
+			// if (TEST_NormTangent) {
+			// 	this.tangent1.normalize();
+			// 	this.tangent2.normalize();
+			// }
 
 			this.impulse = 0;
+			this.impulseT1 = 0;
+			this.impulseT2 = 0;
 			this.appliedImpulse =0;
 			this.appliedPushImpulse = 0;
 
@@ -1112,13 +1127,19 @@ define(function(){
 					this.normal = contact.normal;
 					this.vertexA = contact.originA;
 					this.vertexB = contact.originB;
-					this.tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: using correct normal?
-					this.tangent2 = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal );// FIXME: using correct normal
-
-					if (TEST_NormTangent) {
-						this.tangent.normalize();
-						this.tangent2.normalize();
+					if (Math.abs(this.normal.x) >= 0.57735) {
+						this.tangent1 = new THREE.Vector3( this.normal.y, -this.normal.x, 0.0 );
+					} else {
+						this.tangent1 = new THREE.Vector3( 0.0, this.normal.z, -this.normal.y );
 					}
+					this.tangent1.normalize();
+					this.tangent2 = new THREE.Vector3();
+					this.tangent2.copy(this.normal).cross(this.tangent1);
+
+					// if (TEST_NormTangent) {
+					// 	this.tangent.normalize();
+					// 	this.tangent2.normalize();
+					// }
 					this.depth = contact.depth;
 					this.setJacobian(this.rows[0]);
 				}
@@ -1128,7 +1149,7 @@ define(function(){
 				var denom1 = 0, denom2 = 0;
 				if (this.bodyA && this.bodyA.invMass !== 0) {
 					// denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
-					denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(TEST_DenomFactor1*this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
+					denom1 = this.bodyA.invMass + this.normal.dot( this.tangent1.clone().multiplyScalar(TEST_DenomFactor1*this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
 				}
 
 				if (this.bodyB && this.bodyB.invMass !== 0) {
@@ -1409,7 +1430,7 @@ define(function(){
 
 					// ReactPhysics way
 					// Warmstart
-					contact.impulse *= 0.9;
+					contact.impulse *= physique.world.warmth;
 					var rA = contact.vertexA.clone().sub(contact.bodyA.position),
 						rB = contact.vertexB.clone().sub(contact.bodyB.position);
 					contact.bodyA.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * contact.impulse) );
@@ -1417,6 +1438,25 @@ define(function(){
 
 					contact.bodyB.velocity.sub( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * contact.impulse) );
 					contact.bodyB.angularVelocity.sub( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulse) );
+
+					// Friction 1 Warmstart
+					contact.impulseT1 *= physique.world.warmth;
+					contact.bodyA.velocity.add( contact.tangent1.clone().multiplyScalar(-contact.bodyA.invMass * contact.impulseT1) );
+					contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent1).multiplyScalar(-contact.bodyA.invInertiaTensor * contact.impulseT1) );
+
+					contact.bodyB.velocity.add( contact.tangent1.clone().multiplyScalar(contact.bodyB.invMass * contact.impulseT1) );
+					contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent1).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulseT1) );
+
+
+					// Friction 2 Warmstart
+					contact.impulseT2 *= physique.world.warmth;
+					contact.bodyA.velocity.add( contact.tangent2.clone().multiplyScalar(-contact.bodyA.invMass * contact.impulseT2) );
+					contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent2).multiplyScalar(-contact.bodyA.invInertiaTensor * contact.impulseT2) );
+
+					contact.bodyB.velocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invMass * contact.impulseT2) );
+					contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulseT2) );
+
+
 
 
 					contact.appliedPushImpulse = 0;
@@ -1654,6 +1694,7 @@ define(function(){
 						// ReactPhysics3D way
 						// FIXME: may need to reverse normal (they use triangle.normal)
 						// FIXME: rA = pA - a, rB = pB - b ... they use 2 contact points.. transform contact
+						// FIXME: double check effective mass: http://danielchappuis.ch/download/ConstraintsDerivationRigidBody3D.pdf  
 						// point into A or B space (probably rotate/add position). 
 						// 	pA = triangle->computeClosestPointOfObject(suppPointsA)
 						// 	pB = body2Tobody1.getInverse() * triangle->computeClosestPointOfObject(suppPointsB)
@@ -1665,7 +1706,7 @@ define(function(){
 						var deltaVDotN = -dV.dot(contact.normal),
 							JV = deltaVDotN;
 
-						var b = (contact.depth - physique.world.slop) * (-0.4)// + JV * 0.25; // TODO: restitution
+						var b = (contact.depth - physique.world.slop) * (-physique.world.baumgarte) + JV * physique.world.restitution; // TODO: restitution
 
 						// var MA = new THREE.Vector3(), MB = new THREE.Vector3();
 						var MA = 0, MB = 0;
@@ -1679,7 +1720,7 @@ define(function(){
 								tang = rA.clone().cross(norm);
 							// MA = norm.clone().multiplyScalar(mass);
 							// MA.add( rA.clone().cross(norm).multiplyScalar(iner).cross(rA) );
-							MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
+							MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2); // FIXME: == mass  (since norm.dot(norm) == 1)
 							MA += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
 						}
 						if (contact.bodyB.invMass !== 0) {
@@ -1710,6 +1751,93 @@ define(function(){
 
 						contact.bodyB.velocity.sub( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
 						contact.bodyB.angularVelocity.sub( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+
+
+
+
+
+						// Friction 1
+						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+
+						deltaVDotN = dV.dot(contact.tangent1);
+						JV = deltaVDotN;
+
+						var friction1Mass = 0.0,
+							friction2Mass = 0.0;
+						MA = 0;
+						if (contact.bodyA.invMass !== 0) {
+							var mass = contact.bodyA.invMass,
+								iner = contact.bodyA.invInertiaTensor,
+								tang = contact.tangent1.clone(),
+								rv   = rA.clone().cross(tang);
+							MA = mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+						}
+
+						MB = 0;
+						if (contact.bodyB.invMass !== 0) {
+							var mass = contact.bodyB.invMass,
+								iner = contact.bodyB.invInertiaTensor,
+								tang = contact.tangent1.clone(),
+								rv   = rB.clone().cross(tang);
+							MA = mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+						}
+
+						deltaLambda = -JV / (MA + MB);
+						lambdaTemp = contact.impulseT1;
+						var maxImpulse = physique.world.friction * contact.impulse; 
+						contact.impulseT1 = Math.max(-maxImpulse, Math.min(maxImpulse, lambdaTemp + deltaLambda));
+						deltaLambda = contact.impulseT1 - lambdaTemp;
+
+						contact.bodyA.velocity.add( contact.tangent1.clone().multiplyScalar(-contact.bodyA.invMass * deltaLambda) );
+						contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent1).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+
+						contact.bodyB.velocity.add( contact.tangent1.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
+						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent1).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+
+
+						// Friction 2
+						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+
+						deltaVDotN = dV.dot(contact.tangent2);
+						JV = deltaVDotN;
+
+						var friction1Mass = 0.0,
+							friction2Mass = 0.0;
+						MA = 0;
+						if (contact.bodyA.invMass !== 0) {
+							var mass = contact.bodyA.invMass,
+								iner = contact.bodyA.invInertiaTensor,
+								tang = contact.tangent2.clone(),
+								rv   = rA.clone().cross(tang);
+							MA = mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+						}
+
+						MB = 0;
+						if (contact.bodyB.invMass !== 0) {
+							var mass = contact.bodyB.invMass,
+								iner = contact.bodyB.invInertiaTensor,
+								tang = contact.tangent2.clone(),
+								rv   = rB.clone().cross(tang);
+							MA = mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+						}
+
+						deltaLambda = -JV / (MA + MB);
+						lambdaTemp = contact.impulseT2;
+						var maxImpulse = physique.world.friction * contact.impulse;
+						contact.impulseT2 = Math.max(-maxImpulse, Math.min(maxImpulse, lambdaTemp + deltaLambda));
+						deltaLambda = contact.impulseT2 - lambdaTemp;
+
+						contact.bodyA.velocity.add( contact.tangent2.clone().multiplyScalar(-contact.bodyA.invMass * deltaLambda) );
+						contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent2).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+
+						contact.bodyB.velocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
+						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
 
 
 
@@ -1937,15 +2065,15 @@ define(function(){
 
 				if (!bodyA.material.hasOwnProperty('storedColor') && bodyA.active) {
 					bodyA.material.storedColor = _.clone(bodyA.material.color);
-					bodyA.material.color.r = 1.0;
-					bodyA.material.color.g = 0.0;
+					bodyA.material.color.r = bodyA.uid % 2 == 0 ? 1.0 : 0.0;
+					bodyA.material.color.g = bodyA.uid % 2 == 0 ? 0.0 : 1.0;
 					bodyA.material.color.b = 0.0;
 				}
 
 				if (!bodyB.material.hasOwnProperty('storedColor') && bodyB.active) {
 					bodyB.material.storedColor = _.clone(bodyB.material.color);
-					bodyB.material.color.r = 1.0;
-					bodyB.material.color.g = 0.0;
+					bodyB.material.color.r = bodyB.uid % 2 == 0 ? 1.0 : 0.0;
+					bodyB.material.color.g = bodyB.uid % 2 == 0 ? 0.0 : 1.0;
 					bodyB.material.color.b = 0.0;
 				}
 			}

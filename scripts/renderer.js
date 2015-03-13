@@ -181,8 +181,8 @@ define(function(){
 			if (meshProps.type === MESH_BOX) {
 
 				geometry = new THREE.BoxGeometry( 1, 1, 1, 1, 1, 1 );
-				material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
-				// material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
+				// material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
+				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
 				mesh.dimensions = { height: 1, width: 1, depth: 1 };

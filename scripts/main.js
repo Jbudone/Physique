@@ -19,7 +19,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 			isGoblin: false,
 			twoObjects: true,
-			moreObjects: 2
+			moreObjects: 10,
+			debugPoints: false
 	};
 
 	THREE.Euler.prototype.sub = function(vec){
@@ -82,43 +83,45 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 	if (!Settings.isGoblin) {
 
-	var debugArrows = {};
-	physique.onDebugHelperArrow = function(hitHash, dir, origin, depth){
-		if (debugArrows.hasOwnProperty(hitHash)) {
-			var mesh = debugArrows[hitHash].mesh;
-			renderer.remove(mesh);
-			mesh = renderer.addArrow(dir, origin, depth);
-			debugArrows[hitHash] = {
-				mesh: mesh
+		if (Settings.debugPoints) {
+			var debugArrows = {};
+			physique.onDebugHelperArrow = function(hitHash, dir, origin, depth){
+				if (debugArrows.hasOwnProperty(hitHash)) {
+					var mesh = debugArrows[hitHash].mesh;
+					renderer.remove(mesh);
+					mesh = renderer.addArrow(dir, origin, depth);
+					debugArrows[hitHash] = {
+						mesh: mesh
+					};
+				} else {
+					var mesh = renderer.addArrow(dir, origin, depth);
+					debugArrows[hitHash] = {
+						mesh: mesh
+					};
+				}
 			};
-		} else {
-			var mesh = renderer.addArrow(dir, origin, depth);
-			debugArrows[hitHash] = {
-				mesh: mesh
+
+			var debugContacts = {};
+			physique.onNewContact = function(hash, point){
+				var Bpoint = (hash[hash.length-1]=='B');
+				var mesh = renderer.addContact(point, Bpoint);
+				debugContacts[hash] = {
+					mesh: mesh
+				};
 			};
+
+			physique.onUpdateContact = function(hash, point){
+				var mesh = debugContacts[hash].mesh;
+				mesh.position.copy(point);
+			};
+
+			physique.onRemoveContact = function(hash){
+				var mesh = debugContacts[hash].mesh;
+				renderer.remove(mesh);
+				delete debugContacts[hash];
+			};
+
 		}
-	};
-
-	var debugContacts = {};
-	physique.onNewContact = function(hash, point){
-		var Bpoint = (hash[hash.length-1]=='B');
-		var mesh = renderer.addContact(point, Bpoint);
-		debugContacts[hash] = {
-			mesh: mesh
-		};
-	};
-
-	physique.onUpdateContact = function(hash, point){
-		var mesh = debugContacts[hash].mesh;
-		mesh.position.copy(point);
-	};
-
-	physique.onRemoveContact = function(hash){
-		var mesh = debugContacts[hash].mesh;
-		renderer.remove(mesh);
-		delete debugContacts[hash];
-	};
-
 	}
 
 	$('#objectsInput').on('input', function(){
@@ -313,13 +316,15 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 		requestAnimationFrame(update);
 		deltaTime = Math.min(200, deltaTime);
-		while (deltaTime > 0) {
-			var delta = Math.min(50, deltaTime);
 
 			isMoving = Input.UI.viewport.isMoving;
 			if (isMoving && activeMesh) {
 				moveMesh(delta);
 			}
+
+
+		while (deltaTime > 0) {
+			var delta = Math.min(5, deltaTime);
 
 			if (Settings.isGoblin) {
 				world.step(1/60);
@@ -332,9 +337,12 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			} else {
 				physique.step(delta);
 			}
+			deltaTime -= delta;
+		}
+
+		delta = deltaTime;
 			renderer.render();
 			Input.step(delta);
-			deltaTime -= delta;
 
 
 			if (raycaster.active && raycaster.hasUpdated) {
@@ -370,7 +378,6 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				raycaster.hasMoved = null;
 				raycaster.holdingOnto.userMoved = true;
 			}
-		}
 
 		lastUpdate = now;
 	};

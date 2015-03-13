@@ -48,10 +48,10 @@
 			- slop
 			- warm start?
 
-			- BUG: 2 boxes colliding results in them both knocking each other apart, and at least one of the boxes sinks slightly into the ground without ever coming back up..this is because of the sequential impulses which push the box up and then pushes it back down (contact.impulse - cached) < 0
-			- BUG: box sometimes slips
+			- BUG: lots of stacked boxes colliding results in delayed penetration...this may be due to deepest penetration at one point, and may need to rotate box to find multiple contact points
+			- BUG: pick up + drop box: at low height we can see restitution (bounce), but at slightly higher height we can see the box falls slightly under the ground and has to raise back up (seems like only certain heights and only sometimes)
 
-		* UI: edit clock
+		* UI 
 			- edit clock
 			- keep track of snapshots of world; then step backwards in time (debug)
 			- improve raycasting / moving object
