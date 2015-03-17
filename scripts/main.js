@@ -19,8 +19,10 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 			isGoblin: false,
 			twoObjects: true,
-			moreObjects: 10,
-			debugPoints: false
+			moreObjects: 4,
+			debugPoints: false,
+			maxTime: 600,
+			stepTime: 10
 	};
 
 	THREE.Euler.prototype.sub = function(vec){
@@ -165,6 +167,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		}
 	}).data('oldVal', 0);
 
+
 	var isMoving = false,
 		moveScale = 0.2,
 		MOVE_UP = 1<<5,
@@ -178,37 +181,48 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		canvas = renderObj.domElement;
 		document.body.appendChild( canvas );
 
-		scene.addMesh({
-			type: MESH_BOX,
-			body: BODY_CUBE,
-			position: new THREE.Vector3(0, 0, 0)
-		});
+		var startScene = function(){
 
-		if (Settings.twoObjects) {
 			scene.addMesh({
 				type: MESH_BOX,
 				body: BODY_CUBE,
-				position: new THREE.Vector3(0, 1.5, 0)
+				position: new THREE.Vector3(0, 0, 0)
 			});
 
-			if (Settings.moreObjects) {
-				var offsetY = 1.5;
-				for (var i=2; i<Settings.moreObjects; ++i) {
-					offsetY += 1.5;
-					scene.addMesh({
-						type: MESH_BOX,
-						body: BODY_CUBE,
-						position: new THREE.Vector3(0, offsetY, 0)
-					});
+			if (Settings.twoObjects) {
+				scene.addMesh({
+					type: MESH_BOX,
+					body: BODY_CUBE,
+					position: new THREE.Vector3(0, 1.5, 0)
+				});
+
+				if (Settings.moreObjects) {
+					var offsetY = 1.5;
+					for (var i=2; i<Settings.moreObjects; ++i) {
+						offsetY += 1.5;
+						scene.addMesh({
+							type: MESH_BOX,
+							body: BODY_CUBE,
+							position: new THREE.Vector3(0, offsetY, 0)
+						});
+					}
 				}
 			}
-		}
 
-		scene.addMesh({
-			type: MESH_PLANE,
-			body: BODY_FLOOR,
-			position: new THREE.Vector3(0, -4, 10)
-		});
+			scene.addMesh({
+				type: MESH_PLANE,
+				body: BODY_FLOOR,
+				position: new THREE.Vector3(0, -4, 10)
+			});
+
+		};
+
+		var resetScene = function(){
+
+			
+		};
+
+		startScene();
 
 
 
@@ -250,9 +264,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			activeMesh = null;
 		});
 
-		var physiqueScale = physique.world.scaleTime;
 		$('#startPhysics').click(function(){
-			physique.world.scaleTime = physiqueScale;
+			physique.world.scaleTime = $('#scaleTime').val();
 			physique.world.runOnce = null;
 			return false;
 		});
@@ -264,11 +277,28 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		});
 
 		$('#stepPhysics').click(function(){
-			physique.world.scaleTime = physiqueScale;
+			physique.world.scaleTime = $('#scaleTime').val();
 			physique.world.runOnce = true;
 			return false;
 		});
 
+		var addInteractiveSetting = function(el, propName){
+			el.val( physique.world[propName] ).on('change input', function(){
+				var val = $(this).val();
+				if (isNaN(val) || val === "") {
+					$(this).val( physique.world[propName] );
+				} else {
+					physique.world[propName] = $(this).val();
+				}
+			});
+		};
+		addInteractiveSetting( $('#scaleTime'), 'scaleTime' );
+		addInteractiveSetting( $('#baumgarte'), 'baumgarte' );
+		addInteractiveSetting( $('#damping'), 'damping' );
+		addInteractiveSetting( $('#warmth'), 'warmth' );
+		addInteractiveSetting( $('#restitution'), 'restitution' );
+		addInteractiveSetting( $('#friction'), 'friction' );
+		addInteractiveSetting( $('#slop'), 'slop' );
 
 
 		startup();
@@ -315,7 +345,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			deltaTime = now - lastUpdate;
 
 		requestAnimationFrame(update);
-		deltaTime = Math.min(200, deltaTime);
+		var _deltaTime = deltaTime;
+		deltaTime = Math.min(Settings.maxTime, deltaTime);
 
 			isMoving = Input.UI.viewport.isMoving;
 			if (isMoving && activeMesh) {
@@ -323,8 +354,9 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			}
 
 
+			console.log("Stepping at: "+deltaTime);
 		while (deltaTime > 0) {
-			var delta = Math.min(5, deltaTime);
+			var delta = Math.min(Settings.stepTime, deltaTime);
 
 			if (Settings.isGoblin) {
 				world.step(1/60);
@@ -340,7 +372,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			deltaTime -= delta;
 		}
 
-		delta = deltaTime;
+		delta = _deltaTime;
 			renderer.render();
 			Input.step(delta);
 

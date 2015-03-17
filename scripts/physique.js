@@ -12,15 +12,18 @@ define(function(){
 
 		this.world = {
 			gravity: -9.8,
-			scaleTime: 0.001,
+			scaleTime: 0.0005,
 
-			slop: -0.001,
+			slop: -0.002,
 			maxDepth: 4.0, // before falling through
-			damping: 1.00,
+			damping: 0.98,//0.95, // FIXME: needed for box stacking?
 			warmth: 0.9,
-			baumgarte: 0.4,
-			restitution: 0.25,
-			friction: 0.2, // sqrt( mu1 * mu2 )
+			baumgarte: 0.2, // FIXME: helps with faster penetration solving
+			restitution: 0.0, // FIXME: found as 0.25 in other places
+			friction: 0.9, // sqrt( mu1 * mu2 )  FIXME: 0.1 for better box stacking stability
+			minVel: 0.01,
+
+			velocityIterations: 10,
 
 			maxContactsInManifold: 4,
 			runOnce: null
@@ -35,7 +38,7 @@ define(function(){
 			TEST_NormTangent = true,
 			resetDeltas = true;
 
-		var mass = 0.60,
+		var mass = 1.0,//0.60,
 			inertia = (1/3) * mass;
 
 		/*****************************************************************
@@ -1627,8 +1630,7 @@ define(function(){
 			}
 
 
-			var collisionResIterations = 10;
-					for (var iteration=0; iteration<collisionResIterations; ++iteration) {
+					for (var iteration=0; iteration<physique.world.velocityIterations; ++iteration) {
 			for (var manifoldID in contactManifolds) {
 
 				var manifold = contactManifolds[manifoldID];
@@ -1691,6 +1693,19 @@ define(function(){
 						*/
 
 
+						var rA = contact.vertexA.clone().sub(contact.bodyA.position),
+							rB = contact.vertexB.clone().sub(contact.bodyB.position),
+							dV = 0,
+							deltaVDotN = 0,
+							JV = 0,
+							MA = 0,
+							MB = 0,
+							deltaLambda = 0,
+							lambdaTemp = 0;
+
+
+
+
 						// ReactPhysics3D way
 						// FIXME: may need to reverse normal (they use triangle.normal)
 						// FIXME: rA = pA - a, rB = pB - b ... they use 2 contact points.. transform contact
@@ -1706,35 +1721,37 @@ define(function(){
 						var deltaVDotN = -dV.dot(contact.normal),
 							JV = deltaVDotN;
 
-						var b = (contact.depth - physique.world.slop) * (-physique.world.baumgarte) + JV * physique.world.restitution; // TODO: restitution
+						var b = (contact.depth - physique.world.slop) * (-physique.world.baumgarte * (dt * 200.0)) - JV * physique.world.restitution; // TODO: restitution
 
 						// var MA = new THREE.Vector3(), MB = new THREE.Vector3();
 						var MA = 0, MB = 0;
 						if (contact.bodyA.invMass !== 0) {
-							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate()).cross(rA)).dot(contact.normal.clone().negate());
+							MA = contact.bodyA.invMass + (rA.clone().multiplyScalar(contact.bodyA.invInertiaTensor).cross(contact.normal.clone().negate()).cross(rA)).dot(contact.normal.clone().negate());
 							// MA = contact.bodyA.invMass + (contact.vertexA.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyA.invInertiaTensor)).cross(contact.vertexA).dot(contact.normal.clone().negate());
 							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (contact.vertexA.clone().cross(contact.normal.clone().negate())).cross(contact.vertexA).dot(contact.normal.clone().negate());
-							var mass = contact.bodyA.invMass,
-								iner = contact.bodyA.invInertiaTensor,
-								norm = contact.normal.clone().negate(),
-								tang = rA.clone().cross(norm);
-							// MA = norm.clone().multiplyScalar(mass);
-							// MA.add( rA.clone().cross(norm).multiplyScalar(iner).cross(rA) );
-							MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2); // FIXME: == mass  (since norm.dot(norm) == 1)
-							MA += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
+							// var mass = contact.bodyA.invMass,
+							// 	iner = contact.bodyA.invInertiaTensor,
+							// 	norm = contact.normal.clone().negate(),
+							// 	tang = rA.clone().cross(norm);
+							// // MA = norm.clone().multiplyScalar(mass);
+							// // MA.add( rA.clone().cross(norm).multiplyScalar(iner).cross(rA) );
+							// MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2); // FIXME: == mass  (since norm.dot(norm) == 1)
+							// MA += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
 						}
 						if (contact.bodyB.invMass !== 0) {
-							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate())).dot(contact.normal.clone().negate());
+							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate()).cross(rB)).dot(contact.normal.clone().negate());
+							MB = contact.bodyB.invMass + (rB.clone().multiplyScalar(contact.bodyB.invInertiaTensor).cross(contact.normal.clone().negate()).cross(rB)).dot(contact.normal.clone().negate());
 							// MB = contact.bodyB.invMass + (contact.vertexB.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyB.invInertiaTensor)).cross(contact.vertexB).dot(contact.normal.clone().negate());
 							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (contact.vertexB.clone().cross(contact.normal.clone().negate())).cross(contact.vertexB).dot(contact.normal.clone().negate());
-							var mass = contact.bodyB.invMass,
-								iner = contact.bodyB.invInertiaTensor,
-								norm = contact.normal.clone().negate(),
-								tang = rB.clone().cross(norm);
-							// MB = norm.clone().multiplyScalar(-mass);
-							// MB.sub( rB.clone().cross(norm.clone().negate()).multiplyScalar(iner).cross(rB) );
-							MB = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
-							MB += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
+							// var mass = contact.bodyB.invMass,
+							// 	iner = contact.bodyB.invInertiaTensor,
+							// 	norm = contact.normal.clone().negate(),
+							// 	tang = rB.clone().cross(norm);
+							// // MB = norm.clone().multiplyScalar(-mass);
+							// // MB.sub( rB.clone().cross(norm.clone().negate()).multiplyScalar(iner).cross(rB) );
+							// MB = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
+							// MB += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
 						}
 						// var Meffective = MA.add(MB).dot(contact.normal.clone().negate());// 1 / (MA + MB);
 						var Meffective =  (MA + MB);
@@ -1751,10 +1768,6 @@ define(function(){
 
 						contact.bodyB.velocity.sub( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
 						contact.bodyB.angularVelocity.sub( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
-
-
-
-
 
 						// Friction 1
 						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
@@ -2141,13 +2154,13 @@ define(function(){
 					body.velocity.multiplyScalar(damping);
 					body.angularVelocity.multiplyScalar(damping);
 
-					// var epsV = 0;
-					// if (Math.abs(body.velocity.x) < epsV) body.velocity.x = 0;
-					// if (Math.abs(body.velocity.y) < epsV) body.velocity.y = 0;
-					// if (Math.abs(body.velocity.z) < epsV) body.velocity.z = 0;
-					// if (Math.abs(body.angularVelocity.x) < epsV) body.angularVelocity.x = 0;
-					// if (Math.abs(body.angularVelocity.y) < epsV) body.angularVelocity.y = 0;
-					// if (Math.abs(body.angularVelocity.z) < epsV) body.angularVelocity.z = 0;
+					var epsV = this.minVel;
+					if (Math.abs(body.velocity.x) < epsV) body.velocity.x = 0;
+					if (Math.abs(body.velocity.y) < epsV) body.velocity.y = 0;
+					if (Math.abs(body.velocity.z) < epsV) body.velocity.z = 0;
+					if (Math.abs(body.angularVelocity.x) < epsV) body.angularVelocity.x = 0;
+					if (Math.abs(body.angularVelocity.y) < epsV) body.angularVelocity.y = 0;
+					if (Math.abs(body.angularVelocity.z) < epsV) body.angularVelocity.z = 0;
 
 					// body.deltaV.multiplyScalar(0);
 					// body.deltaW.multiplyScalar(0);

@@ -15,13 +15,15 @@ define(function(){
 		var texturePack = {
 
 			textureList: {
-				stone: 'stone.jpg'
+				stone: { file: 'stone.jpg' },
+				grass: { file: 'grass.jpg', options: { repeat: true } }
 			},
 
 			textureMap: {
 			}
 		};
-		texturePack.textureMap[MESH_PLANE] = 'stone';
+		texturePack.textureMap[MESH_BOX] = 'stone';
+		texturePack.textureMap[MESH_PLANE] = 'grass';
 
 		this.camera = camera;
 		this.startup = function(){
@@ -55,7 +57,7 @@ define(function(){
 					var loader = new THREE.TextureLoader();
 					var texturesToLoad = [];
 					for (var textureID in texturePack.textureList) {
-						texturesToLoad.push({ id: textureID, url: texturePack.textureList[textureID] });
+						texturesToLoad.push({ id: textureID, url: texturePack.textureList[textureID].file, options: texturePack.textureList[textureID].options });
 					}
 					var loadNext = function(){
 
@@ -66,8 +68,14 @@ define(function(){
 						var textureToLoad = texturesToLoad.shift();
 						loader.load('textures/'+textureToLoad.url,
 								function(texture){
-									texturePack.textureList[textureToLoad.id] = {
-										texture: texture
+									texturePack.textureList[textureToLoad.id].texture = texture;
+
+									if (_.isObject(textureToLoad.options)) {
+										texture.wrapS = THREE.RepeatWrapping;
+										texture.wrapT = THREE.RepeatWrapping;
+										texture.anisotropy = 8;
+										texture.repeat.set( 256, 256 );
+										texture.update();
 									}
 
 									if (texturesToLoad.length === 0) {
@@ -103,7 +111,7 @@ define(function(){
 
 			return new Promise(function(succeeded, failed){
 
-				var urlPrefix = "textures/DarkStormy/DarkStormy";
+				var urlPrefix = "textures/ThickCloudsWater/ThickCloudsWater";
 				var urls = [ urlPrefix + "Left2048.png", urlPrefix + "Right2048.png",
 					urlPrefix + "Up2048.png", urlPrefix + "Down2048.png",
 					urlPrefix + "Front2048.png", urlPrefix + "Back2048.png" ];
@@ -182,25 +190,24 @@ define(function(){
 
 				geometry = new THREE.BoxGeometry( 1, 1, 1, 1, 1, 1 );
 				// material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
-				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
+				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_BOX]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
 				mesh.dimensions = { height: 1, width: 1, depth: 1 };
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
-				// mesh.rotation.x = Math.PI * 0.25;
-				// mesh.rotation.y = -Math.PI * 0.25;
-				// mesh.rotation.z = -Math.PI * 0.25;
+				// if (Math.random() > 0.3) mesh.rotation.x = Math.PI * 0.25;
+				// if (Math.random() > 0.3) mesh.rotation.y = -Math.PI * 0.25;
+				// if (Math.random() > 0.3) mesh.rotation.z = -Math.PI * 0.25;
 
 			} else if (meshProps.type === MESH_PLANE) {
 
-				// geometry = new THREE.PlaneGeometry( 40, 40, 1, 1 );
-				geometry = new THREE.BoxGeometry( 40, 5, 40, 1, 1, 1 );
+				geometry = new THREE.BoxGeometry( 400, 5, 400, 1, 1, 1 );
 				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
-				mesh.rotation.x = 0.0;//-1 * Math.PI / (2.0 + 0.001);
+				mesh.rotation.x = 0.0;
 				mesh.position.x = 0.0;
 				mesh.dimensions = { height: 0.1, width: 40, depth: 40 };
 
@@ -213,7 +220,7 @@ define(function(){
 			// Bounding box
 			var bbox = new THREE.BoundingBoxHelper( mesh, 0xff0000 );
 			bbox.update();
-			scene.add( bbox );
+			// scene.add( bbox );
 			mesh.AABB = bbox;
 
 			return mesh;

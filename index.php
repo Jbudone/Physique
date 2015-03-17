@@ -50,12 +50,24 @@
 
 			- BUG: lots of stacked boxes colliding results in delayed penetration...this may be due to deepest penetration at one point, and may need to rotate box to find multiple contact points
 			- BUG: pick up + drop box: at low height we can see restitution (bounce), but at slightly higher height we can see the box falls slightly under the ground and has to raise back up (seems like only certain heights and only sometimes)
+			- BUG: 2 objects colliding in a weird way sometimes disappear (rare bug -- probably an explosive impulse? or NaN?)
 
 		* UI 
 			- edit clock
 			- keep track of snapshots of world; then step backwards in time (debug)
 			- improve raycasting / moving object
+		* Examples
+			- Dominos
+			- Wall of cubes, and shooting out a massive sphere at it (like in the proposal pic)
+			- Hinge joint: bridge; chain w/ sphere (wrecking ball)
+			- Point joint: machine w/ claw to turn, go down, grab cube, raise up, turn and drop cube
 
+
+
+	* Stable box stacking
+	* Speed improvements
+	* Boxes slowly raising out of ground
+	
 
 	-->
 
