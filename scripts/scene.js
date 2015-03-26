@@ -3,6 +3,7 @@ define(function(){
 	var Scene = function(){
 
 		this.onAddedMesh = new Function();
+		this.onRemovedMesh = new Function();
 
 		this.meshes = {};
 		this.meshCount = 0;
@@ -18,6 +19,14 @@ define(function(){
 			this.onAddedMesh(mesh);
 
 			return mesh;
+		};
+
+		this.reset = function(){
+
+			for (var meshID in this.meshes) {
+				this.onRemovedMesh(this.meshes[meshID]);
+				delete this.meshes[meshID];
+			}
 		};
 	};
 

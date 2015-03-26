@@ -49,7 +49,8 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 	var update     = null,
 		startup    = null,
 		lastUpdate = null,
-		activeMesh = null;
+		activeMesh = null,
+		runWorld   = false;
 
 	scene.onAddedMesh = function(_mesh){
 		var mesh = renderer.addMesh(_mesh.settings);
@@ -61,6 +62,11 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		physique.addBody(_mesh);
 
 		$('#objects').append( $('<option/>').attr('value', _mesh.uid) );
+	};
+
+	scene.onRemovedMesh = function(mesh){
+		renderer.removeMesh(mesh);
+		physique.removeBody(mesh);
 	};
 
 
@@ -159,176 +165,159 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		canvas = renderObj.domElement;
 		document.body.appendChild( canvas );
 
-		var startScene = function(){
+		var loadedScene = function(exampleScene){
 
-			scene.addMesh({
-				type: MESH_SPHERE,
-				body: BODY_SPHERE,
-				position: new THREE.Vector3(0, 5, 2)
-			});
 
-			scene.addMesh({
-				type: MESH_BOX,
-				body: BODY_FLOOR,
-				position: new THREE.Vector3(0, 0, 2),
-				dimensions: new THREE.Vector3(4, 0.2, 2),
-				rotation: new THREE.Vector3(0, 0, Math.PI * 0.3)
-			});
+			runWorld = false;
+			var startScene = function(){
 
-			if (Settings.twoObjects) {
-				scene.addMesh({
+				runWorld = true;
+				exampleScene.initialize(scene);
+			};
+
+			var resetScene = function(){
+
+				scene.reset();
+			};
+
+			var shootCube = function(){
+
+				var mesh = scene.addMesh({
 					type: MESH_BOX,
 					body: BODY_CUBE,
-					position: new THREE.Vector3(0, 1.5, 0)
+					position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
 				});
 
-				if (Settings.moreObjects) {
-					var offsetY = Settings.offsetYOfObjects;
-					for (var i=2; i<Settings.moreObjects; ++i) {
-						offsetY += Settings.offsetYOfObjects;
-						scene.addMesh({
-							type: MESH_BOX,
-							body: BODY_CUBE,
-							position: new THREE.Vector3(0, offsetY, 0)
-						});
-					}
-				}
-			}
+				var shootMultiplier = 20.0;
+				var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
 
-			scene.addMesh({
-				type: MESH_PLANE,
-				body: BODY_FLOOR,
-				position: new THREE.Vector3(0, -4, 10)
-			});
+				var qX = new THREE.Quaternion(),
+					qY = new THREE.Quaternion(),
+					qZ = new THREE.Quaternion(),
+					m = new THREE.Matrix4(),
+					vY = new THREE.Vector3(0,1,0),
+					vX = new THREE.Vector3(1,0,0),
+					vZ = new THREE.Vector3(0,0,1);
 
-			startup();
-		};
+				qX.setFromAxisAngle( vY, -renderer.camera.phi );
+				vX.applyQuaternion(qX);
+				qY.setFromAxisAngle( vX, -renderer.camera.theta );
+				vY.multiply(qY);
+				qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
+				qY.multiply(qX);
+				qY.multiply(qZ);
 
-		var resetScene = function(){
+				moveDir2.applyQuaternion(qY);
 
-			
-		};
+				mesh.body.velocity.add(moveDir2);
 
-		var shootCube = function(){
+			};
 
-			var mesh = scene.addMesh({
-				type: MESH_BOX,
-				body: BODY_CUBE,
-				position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
-			});
-
-			var shootMultiplier = 20.0;
-			var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
-
-			var qX = new THREE.Quaternion(),
-				qY = new THREE.Quaternion(),
-				qZ = new THREE.Quaternion(),
-				m = new THREE.Matrix4(),
-				vY = new THREE.Vector3(0,1,0),
-				vX = new THREE.Vector3(1,0,0),
-				vZ = new THREE.Vector3(0,0,1);
-
-			qX.setFromAxisAngle( vY, -renderer.camera.phi );
-			vX.applyQuaternion(qX);
-			qY.setFromAxisAngle( vX, -renderer.camera.theta );
-			vY.multiply(qY);
-			qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
-			qY.multiply(qX);
-			qY.multiply(qZ);
-
-			moveDir2.applyQuaternion(qY);
-
-			mesh.body.velocity.add(moveDir2);
+			resetScene();
+			startScene();
 
 		};
 
-		startScene();
+		startup();
 
+		var loadScene = function(file){
+			require(['../examples/'+file], loadedScene);
+		};
 
-
-		document.addEventListener('keydown', function KeyDownEvent(evt){
-			
-				   if (evt.keyCode === 73) {
-				isMoving |= MOVE_FORWARD;
-			} else if (evt.keyCode === 75) {
-				isMoving |= MOVE_BACKWARD;
-			} else if (evt.keyCode === 74) {
-				isMoving |= MOVE_LEFT;
-			} else if (evt.keyCode === 76) {
-				isMoving |= MOVE_RIGHT;
-			} else if (evt.keyCode === 85) {
-				isMoving |= MOVE_UP;
-			} else if (evt.keyCode === 79) {
-				isMoving |= MOVE_DOWN;
-			} else if (evt.keyCode === 32) {
-				shootCube();
-			}
-		});
-
-		document.addEventListener('keyup', function KeyUpEvent(evt){
-			
-				   if (evt.keyCode === 73) {
-				isMoving &= ~MOVE_FORWARD;
-			} else if (evt.keyCode === 75) {
-				isMoving &= ~MOVE_BACKWARD;
-			} else if (evt.keyCode === 74) {
-				isMoving &= ~MOVE_LEFT;
-			} else if (evt.keyCode === 76) {
-				isMoving &= ~MOVE_RIGHT;
-			} else if (evt.keyCode === 85) {
-				isMoving &= ~MOVE_UP;
-			} else if (evt.keyCode === 79) {
-				isMoving &= ~MOVE_DOWN;
-			}
-		});
-
-		document.addEventListener('mouseup', function MouseUpEvent(evt){
-			activeMesh = null;
-		});
-
-
-		$('#startPhysics').click(function(){
-			physique.world.scaleTime = $('#scaleTime').val();
-			physique.world.runOnce = null;
+		$('#rolling-ball').click(function(){
+			loadScene('rolling-ball');
 			return false;
 		});
 
-		$('#stopPhysics').click(function(){
-			physique.world.scaleTime = 0.0;
-			physique.world.runOnce = null;
+		$('#rolling-ball2').click(function(){
+			loadScene('rolling-ball2');
 			return false;
 		});
-
-		$('#stepPhysics').click(function(){
-			physique.world.scaleTime = $('#scaleTime').val();
-			physique.world.runOnce = true;
-			return false;
-		});
-
-		var addInteractiveSetting = function(el, propName){
-			el.val( physique.world[propName] ).on('change input', function(){
-				var val = $(this).val();
-				if (isNaN(val) || val === "") {
-					$(this).val( physique.world[propName] );
-				} else {
-					physique.world[propName] = $(this).val();
-				}
-			});
-		};
-		addInteractiveSetting( $('#scaleTime'), 'scaleTime' );
-		addInteractiveSetting( $('#baumgarte'), 'baumgarte' );
-		addInteractiveSetting( $('#damping'), 'damping' );
-		addInteractiveSetting( $('#warmth'), 'warmth' );
-		addInteractiveSetting( $('#restitution'), 'restitution' );
-		addInteractiveSetting( $('#friction'), 'friction' );
-		addInteractiveSetting( $('#slop'), 'slop' );
-
 
 
 	}, function(error){
 		console.error(error);
 		console.error(error.stack);
 	});
+
+
+	document.addEventListener('keydown', function KeyDownEvent(evt){
+		
+			   if (evt.keyCode === 73) {
+			isMoving |= MOVE_FORWARD;
+		} else if (evt.keyCode === 75) {
+			isMoving |= MOVE_BACKWARD;
+		} else if (evt.keyCode === 74) {
+			isMoving |= MOVE_LEFT;
+		} else if (evt.keyCode === 76) {
+			isMoving |= MOVE_RIGHT;
+		} else if (evt.keyCode === 85) {
+			isMoving |= MOVE_UP;
+		} else if (evt.keyCode === 79) {
+			isMoving |= MOVE_DOWN;
+		} else if (evt.keyCode === 32) {
+			shootCube();
+		}
+	});
+
+	document.addEventListener('keyup', function KeyUpEvent(evt){
+		
+			   if (evt.keyCode === 73) {
+			isMoving &= ~MOVE_FORWARD;
+		} else if (evt.keyCode === 75) {
+			isMoving &= ~MOVE_BACKWARD;
+		} else if (evt.keyCode === 74) {
+			isMoving &= ~MOVE_LEFT;
+		} else if (evt.keyCode === 76) {
+			isMoving &= ~MOVE_RIGHT;
+		} else if (evt.keyCode === 85) {
+			isMoving &= ~MOVE_UP;
+		} else if (evt.keyCode === 79) {
+			isMoving &= ~MOVE_DOWN;
+		}
+	});
+
+	document.addEventListener('mouseup', function MouseUpEvent(evt){
+		activeMesh = null;
+	});
+
+
+	$('#startPhysics').click(function(){
+		physique.world.scaleTime = $('#scaleTime').val();
+		physique.world.runOnce = null;
+		return false;
+	});
+
+	$('#stopPhysics').click(function(){
+		physique.world.scaleTime = 0.0;
+		physique.world.runOnce = null;
+		return false;
+	});
+
+	$('#stepPhysics').click(function(){
+		physique.world.scaleTime = $('#scaleTime').val();
+		physique.world.runOnce = true;
+		return false;
+	});
+
+	var addInteractiveSetting = function(el, propName){
+		el.val( physique.world[propName] ).on('change input', function(){
+			var val = $(this).val();
+			if (isNaN(val) || val === "") {
+				$(this).val( physique.world[propName] );
+			} else {
+				physique.world[propName] = $(this).val();
+			}
+		});
+	};
+	addInteractiveSetting( $('#scaleTime'), 'scaleTime' );
+	addInteractiveSetting( $('#baumgarte'), 'baumgarte' );
+	addInteractiveSetting( $('#damping'), 'damping' );
+	addInteractiveSetting( $('#warmth'), 'warmth' );
+	addInteractiveSetting( $('#restitution'), 'restitution' );
+	addInteractiveSetting( $('#friction'), 'friction' );
+	addInteractiveSetting( $('#slop'), 'slop' );
+
 
 	var moveMesh = function(delta){
 
@@ -368,6 +357,12 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			deltaTime = now - lastUpdate;
 
 		requestAnimationFrame(update);
+
+		if (!runWorld) {
+			lastUpdate = now;
+			return;
+		}
+
 		var _deltaTime = deltaTime;
 		deltaTime = Math.min(Settings.maxTime, deltaTime);
 

@@ -174,6 +174,10 @@ define(function(){
 			var intersects = raycaster.intersectObjects( scene.children );
 			return intersects;
 		};
+		
+		this.removeMesh = function(mesh){
+			scene.remove(mesh.body);
+		};
 
 		this.addMesh = function(_meshProps){
 			if (!_.isObject(_meshProps)) _meshProps = {};
