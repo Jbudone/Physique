@@ -16,6 +16,8 @@ define(function(){
 
 			this.meshes[mesh.uid] = mesh;
 			this.onAddedMesh(mesh);
+
+			return mesh;
 		};
 	};
 

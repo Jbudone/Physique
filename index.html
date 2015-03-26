@@ -42,15 +42,19 @@
 			- report contact manifold
 		* CR
 			- restitution?
-			- baumgarte?
-			- pre-sequential solvers? split penetration/velocity?
-			- friction
+			- friction effective mass
 			- slop
-			- warm start?
+			- Object sleeping: if object 1 wakes up then it automatically wakes up all other contacts to which its connected... there should be another way around this
+			- Island sleeping?
+			- Guendelman shock propagation
+				- on add manifold: if static, level = 1, else determine from neighbour manifolds (level+1), else set as max (10000) .. update neighbour manifolds ... if static, set island (uuid between bodies); 
+				- on manifold level updated: update island array - array of arrays: [1: [..], 2: [..]] .. manifold stores level and index in island/level list, also stores island uuid
+				- on manifold removed: update island to remove: if island uuid was between these bodies, then look for all other 
 
 			- BUG: lots of stacked boxes colliding results in delayed penetration...this may be due to deepest penetration at one point, and may need to rotate box to find multiple contact points
 			- BUG: pick up + drop box: at low height we can see restitution (bounce), but at slightly higher height we can see the box falls slightly under the ground and has to raise back up (seems like only certain heights and only sometimes)
 			- BUG: 2 objects colliding in a weird way sometimes disappear (rare bug - probably an explosive impulse? or NaN?)
+			- BUG: if 2 objects are asleep in an island, and another object is added it doesn't collide with the top object
 
 		* UI 
 			- edit clock
@@ -61,12 +65,17 @@
 			- Wall of cubes, and shooting out a massive sphere at it (like in the proposal pic)
 			- Hinge joint: bridge; chain w/ sphere (wrecking ball)
 			- Point joint: machine w/ claw to turn, go down, grab cube, raise up, turn and drop cube
+			- https://www.youtube.com/watch?v=iYlG14qg7Vs
+			- https://www.youtube.com/watch?v=viLuuGIDuDk
 
 
 
+	* Sleep mode; realistic timing + delta + settings
 	* Stable box stacking
 	* Speed improvements
 	* Boxes slowly raising out of ground
+	* FIXME: effective mass of friction for each contact (different than effective mass of penetration)
+	* Reset scene
 	
 
 	-->
@@ -93,7 +102,6 @@
 	<script src="scripts/libs/underscore-min.js"></script>
 	<script src="scripts/libs/modernizr.min.js"></script>
 	<script src="scripts/libs/require.js"></script>
-	<!-- <script src="scripts/GoblinPhysics/build/goblin.js"></script> -->
 	<script>
 		requirejs.config({
 			"baseUrl": "scripts",

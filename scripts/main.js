@@ -1,4 +1,4 @@
-define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Renderer, Physique){
+define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene, Renderer, Physique){
 
 
 	var Settings = {
@@ -17,12 +17,12 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				}
 			},
 
-			isGoblin: false,
 			twoObjects: true,
-			moreObjects: 4,
+			moreObjects: 8,
+			offsetYOfObjects: 1.5,
 			debugPoints: false,
 			maxTime: 600,
-			stepTime: 10
+			stepTime: 16 // 1/60th second * 1000ms/s = 16ms
 	};
 
 	THREE.Euler.prototype.sub = function(vec){
@@ -42,11 +42,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		settings: Settings.rendering
 	});
 
-	if (Settings.isGoblin) {
-		world = new Goblin.World( new Goblin.BasicBroadphase(), new Goblin.NarrowPhase(), new Goblin.IterativeSolver() );
-	} else {
-		physique = new Physique();
-	}
+	physique = new Physique();
 
 	raycaster = new THREE.Raycaster();
 
@@ -62,68 +58,50 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 
 		mesh.bodyType = BODY_CUBE;
 
-		if (Settings.isGoblin) {
-			if (_mesh.settings.body === BODY_FLOOR) {
-				mesh.goblin = new Goblin.RigidBody( new Goblin.BoxShape( 20, 2.5, 20 ), 0 );
-			} else {
-				mesh.goblin = new Goblin.RigidBody( new Goblin.BoxShape( 0.5, 0.5, 0.5 ), 1 );
-			}
-			world.addRigidBody( mesh.goblin );
-			mesh.goblin.position.x = mesh.position.x;
-			mesh.goblin.position.y = mesh.position.y;
-			mesh.goblin.position.z = mesh.position.z;
-			mesh.goblin.rotation.x = mesh.rotation._x;
-			mesh.goblin.rotation.y = mesh.rotation._y;
-			mesh.goblin.rotation.z = mesh.rotation._z;
-		} else {
-			physique.addBody(_mesh);
-		}
+		physique.addBody(_mesh);
 
 		$('#objects').append( $('<option/>').attr('value', _mesh.uid) );
 	};
 
 
-	if (!Settings.isGoblin) {
-
-		if (Settings.debugPoints) {
-			var debugArrows = {};
-			physique.onDebugHelperArrow = function(hitHash, dir, origin, depth){
-				if (debugArrows.hasOwnProperty(hitHash)) {
-					var mesh = debugArrows[hitHash].mesh;
-					renderer.remove(mesh);
-					mesh = renderer.addArrow(dir, origin, depth);
-					debugArrows[hitHash] = {
-						mesh: mesh
-					};
-				} else {
-					var mesh = renderer.addArrow(dir, origin, depth);
-					debugArrows[hitHash] = {
-						mesh: mesh
-					};
-				}
-			};
-
-			var debugContacts = {};
-			physique.onNewContact = function(hash, point){
-				var Bpoint = (hash[hash.length-1]=='B');
-				var mesh = renderer.addContact(point, Bpoint);
-				debugContacts[hash] = {
+	if (Settings.debugPoints) {
+		var debugArrows = {};
+		physique.onDebugHelperArrow = function(hitHash, dir, origin, depth){
+			if (debugArrows.hasOwnProperty(hitHash)) {
+				var mesh = debugArrows[hitHash].mesh;
+				renderer.remove(mesh);
+				mesh = renderer.addArrow(dir, origin, depth);
+				debugArrows[hitHash] = {
 					mesh: mesh
 				};
-			};
+			} else {
+				var mesh = renderer.addArrow(dir, origin, depth);
+				debugArrows[hitHash] = {
+					mesh: mesh
+				};
+			}
+		};
 
-			physique.onUpdateContact = function(hash, point){
-				var mesh = debugContacts[hash].mesh;
-				mesh.position.copy(point);
+		var debugContacts = {};
+		physique.onNewContact = function(hash, point){
+			var Bpoint = (hash[hash.length-1]=='B');
+			var mesh = renderer.addContact(point, Bpoint);
+			debugContacts[hash] = {
+				mesh: mesh
 			};
+		};
 
-			physique.onRemoveContact = function(hash){
-				var mesh = debugContacts[hash].mesh;
-				renderer.remove(mesh);
-				delete debugContacts[hash];
-			};
+		physique.onUpdateContact = function(hash, point){
+			var mesh = debugContacts[hash].mesh;
+			mesh.position.copy(point);
+		};
 
-		}
+		physique.onRemoveContact = function(hash){
+			var mesh = debugContacts[hash].mesh;
+			renderer.remove(mesh);
+			delete debugContacts[hash];
+		};
+
 	}
 
 	$('#objectsInput').on('input', function(){
@@ -184,9 +162,17 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		var startScene = function(){
 
 			scene.addMesh({
+				type: MESH_SPHERE,
+				body: BODY_SPHERE,
+				position: new THREE.Vector3(0, 5, 2)
+			});
+
+			scene.addMesh({
 				type: MESH_BOX,
-				body: BODY_CUBE,
-				position: new THREE.Vector3(0, 0, 0)
+				body: BODY_FLOOR,
+				position: new THREE.Vector3(0, 0, 2),
+				dimensions: new THREE.Vector3(4, 0.2, 2),
+				rotation: new THREE.Vector3(0, 0, Math.PI * 0.3)
 			});
 
 			if (Settings.twoObjects) {
@@ -197,9 +183,9 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				});
 
 				if (Settings.moreObjects) {
-					var offsetY = 1.5;
+					var offsetY = Settings.offsetYOfObjects;
 					for (var i=2; i<Settings.moreObjects; ++i) {
-						offsetY += 1.5;
+						offsetY += Settings.offsetYOfObjects;
 						scene.addMesh({
 							type: MESH_BOX,
 							body: BODY_CUBE,
@@ -215,11 +201,45 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				position: new THREE.Vector3(0, -4, 10)
 			});
 
+			startup();
 		};
 
 		var resetScene = function(){
 
 			
+		};
+
+		var shootCube = function(){
+
+			var mesh = scene.addMesh({
+				type: MESH_BOX,
+				body: BODY_CUBE,
+				position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
+			});
+
+			var shootMultiplier = 20.0;
+			var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
+
+			var qX = new THREE.Quaternion(),
+				qY = new THREE.Quaternion(),
+				qZ = new THREE.Quaternion(),
+				m = new THREE.Matrix4(),
+				vY = new THREE.Vector3(0,1,0),
+				vX = new THREE.Vector3(1,0,0),
+				vZ = new THREE.Vector3(0,0,1);
+
+			qX.setFromAxisAngle( vY, -renderer.camera.phi );
+			vX.applyQuaternion(qX);
+			qY.setFromAxisAngle( vX, -renderer.camera.theta );
+			vY.multiply(qY);
+			qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
+			qY.multiply(qX);
+			qY.multiply(qZ);
+
+			moveDir2.applyQuaternion(qY);
+
+			mesh.body.velocity.add(moveDir2);
+
 		};
 
 		startScene();
@@ -240,6 +260,8 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				isMoving |= MOVE_UP;
 			} else if (evt.keyCode === 79) {
 				isMoving |= MOVE_DOWN;
+			} else if (evt.keyCode === 32) {
+				shootCube();
 			}
 		});
 
@@ -263,6 +285,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		document.addEventListener('mouseup', function MouseUpEvent(evt){
 			activeMesh = null;
 		});
+
 
 		$('#startPhysics').click(function(){
 			physique.world.scaleTime = $('#scaleTime').val();
@@ -301,7 +324,7 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 		addInteractiveSetting( $('#slop'), 'slop' );
 
 
-		startup();
+
 	}, function(error){
 		console.error(error);
 		console.error(error.stack);
@@ -354,21 +377,11 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 			}
 
 
-			console.log("Stepping at: "+deltaTime);
+			// console.log("Stepping at: "+deltaTime);
 		while (deltaTime > 0) {
 			var delta = Math.min(Settings.stepTime, deltaTime);
 
-			if (Settings.isGoblin) {
-				world.step(1/60);
-				// Goblin sync
-				for (var meshID in scene.meshes){
-					var mesh = scene.meshes[meshID];
-					mesh.body.position.copy(mesh.body.goblin.position);
-					mesh.body.rotation.copy(new THREE.Euler(mesh.body.goblin.rotation.x, mesh.body.goblin.rotation.y, mesh.body.goblin.rotation.z));
-				}
-			} else {
-				physique.step(delta);
-			}
+			physique.step(delta);
 			deltaTime -= delta;
 		}
 
@@ -383,13 +396,13 @@ define(['input', 'scene', 'renderer', 'physique'], function(Input, Scene, Render
 				if (intersects.length > 0) {
 					for (var i=0; i<intersects.length; ++i) {
 						var intersect = intersects[i];
-						if (intersect.object.active === true) {
+						if (intersect.object.static === false) {
 							activeMesh = intersect.object;
 							activeMesh.distanceFromCamera = intersect.distance;
 							raycaster.holdingOnto = activeMesh;
 							activeMesh.velocity.multiplyScalar(0.0);
 							activeMesh.angularVelocity.multiplyScalar(0.0);
-							raycaster.holdingOnto.active = false;
+							raycaster.holdingOnto.static = true;
 							break;
 						}
 					}

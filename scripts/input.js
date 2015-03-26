@@ -134,7 +134,7 @@ define(function(){
 				raycaster.active = false;
 				
 				if (raycaster.holdingOnto) {
-					raycaster.holdingOnto.active = true;
+					raycaster.holdingOnto.static = false;
 					raycaster.holdingOnto = null;
 				}
 			}
@@ -210,8 +210,6 @@ define(function(){
 				UI.viewport.isMoving |= MOVE_UP;
 			} else if (evt.keyCode === 69) {
 				UI.viewport.isMoving |= MOVE_DOWN;
-			} else if (evt.keyCode === 32) {
-				UI.viewport.isMoving |= MOVE_UP;
 			}
 		});
 
@@ -231,8 +229,6 @@ define(function(){
 				UI.viewport.isMoving &= ~MOVE_UP;
 			} else if (evt.keyCode === 69) {
 				UI.viewport.isMoving &= ~MOVE_DOWN;
-			} else if (evt.keyCode === 32) {
-				UI.viewport.isMoving &= ~MOVE_UP;
 			}
 		});
 

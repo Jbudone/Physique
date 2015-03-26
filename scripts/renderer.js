@@ -1,6 +1,7 @@
 define(function(){
 
 	Keys.add('MESH_BOX');
+	Keys.add('MESH_SPHERE');
 	Keys.add('MESH_PLANE');
 
 	var Renderer = function(components){
@@ -23,6 +24,7 @@ define(function(){
 			}
 		};
 		texturePack.textureMap[MESH_BOX] = 'stone';
+		texturePack.textureMap[MESH_SPHERE] = 'stone';
 		texturePack.textureMap[MESH_PLANE] = 'grass';
 
 		this.camera = camera;
@@ -188,31 +190,60 @@ define(function(){
 
 			if (meshProps.type === MESH_BOX) {
 
-				geometry = new THREE.BoxGeometry( 1, 1, 1, 1, 1, 1 );
+				var x=1, y=1, z=1;
+				if (_meshProps.hasOwnProperty('dimensions')) {
+					x = _meshProps.dimensions.x;
+					y = _meshProps.dimensions.y;
+					z = _meshProps.dimensions.z;
+				}
+
+				geometry = new THREE.BoxGeometry( x, y, z, 1, 1, 1 );
 				// material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
 				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_BOX]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
-				mesh.dimensions = { height: 1, width: 1, depth: 1 };
+				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
+
+			} else if (meshProps.type === MESH_SPHERE) {
+
+				meshProps = _.defaults(_meshProps, {
+					dimensions: { radius: 0.75 }
+				});
+
+				geometry = new THREE.SphereGeometry( meshProps.dimensions.radius, 12, 9 );
+				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_SPHERE]].texture } );
+				mesh = new THREE.Mesh( geometry, material );
+				mesh.radius = meshProps.dimensions.radius;
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
-				// if (Math.random() > 0.3) mesh.rotation.x = Math.PI * 0.25;
-				// if (Math.random() > 0.3) mesh.rotation.y = -Math.PI * 0.25;
-				// if (Math.random() > 0.3) mesh.rotation.z = -Math.PI * 0.25;
 
 			} else if (meshProps.type === MESH_PLANE) {
 
-				geometry = new THREE.BoxGeometry( 400, 5, 400, 1, 1, 1 );
+				var x=400, y=5, z=400;
+				if (_meshProps.hasOwnProperty('dimensions')) {
+					x = _meshProps.dimensions.x;
+					y = _meshProps.dimensions.y;
+					z = _meshProps.dimensions.z;
+				}
+
+
+				geometry = new THREE.BoxGeometry( x, y, z, 1, 1, 1 );
 				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
 				mesh = new THREE.Mesh( geometry, material );
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
-				mesh.rotation.x = 0.0;
-				mesh.position.x = 0.0;
-				mesh.dimensions = { height: 0.1, width: 40, depth: 40 };
-
 			} else {
 				throw new Error("Adding undefined mesh: "+ meshProps.type);
+			}
+
+			if (_meshProps.hasOwnProperty('rotation')) {
+				mesh.rotation.x = _meshProps.rotation.x;
+				mesh.rotation.y = _meshProps.rotation.y;
+				mesh.rotation.z = _meshProps.rotation.z;
+
+				// if (Math.random() > 0.3) mesh.rotation.x = Math.PI * 0.25;
+				// if (Math.random() > 0.3) mesh.rotation.y = -Math.PI * 0.25;
+				// if (Math.random() > 0.3) mesh.rotation.z = -Math.PI * 0.25;
 			}
 
 			scene.add( mesh );
