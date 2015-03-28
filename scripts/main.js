@@ -224,15 +224,20 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			require(['../examples/'+file], loadedScene);
 		};
 
-		$('#rolling-ball').click(function(){
-			loadScene('rolling-ball');
-			return false;
-		});
+		var addScene = function(name, title){
+			var _exampleEl = $('<a/>').attr('href', '#').addClass('button').text(title).click(function(){
+				loadScene(name);
+				return false;
+			});
+			$('#examples').append( _exampleEl );
+		};
 
-		$('#rolling-ball2').click(function(){
-			loadScene('rolling-ball2');
-			return false;
-		});
+		addScene('rolling-ball', "Ball Roll");
+		addScene('box-stacking', "Box Stacking");
+
+
+		// Load default scene
+		loadScene('box-stacking');
 
 
 	}, function(error){
@@ -317,6 +322,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 	addInteractiveSetting( $('#restitution'), 'restitution' );
 	addInteractiveSetting( $('#friction'), 'friction' );
 	addInteractiveSetting( $('#slop'), 'slop' );
+	addInteractiveSetting( $('#minvel'), 'minVel' );
 
 
 	var moveMesh = function(delta){

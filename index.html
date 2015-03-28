@@ -73,11 +73,35 @@
 	* Sleep mode; realistic timing + delta + settings
 	* Stable box stacking
 	* Speed improvements
-	* Boxes slowly raising out of ground
 	* FIXME: effective mass of friction for each contact (different than effective mass of penetration)
 	* Reset scene
 	
 
+	CR RESEARCH FIXING
+		- Baumgarte
+		- Restitution
+		- Penetration solver
+		- Order of algorithm (applying force, damping velocity, applying impulses, etc.)
+		- dt / inv_dt... 
+		- mass has no effect?
+
+	Fixup (GDC2006)
+		- Change penetration depth, normal, etc. to meet the accepted standard, then compare algorithms (positives/negatives)
+			- physique:407 ?? (delete too early?) ... should only delete contact when depth > 0 (not > slop)
+		- Slop should only be applied during bias calculation
+		- solve friction and then normal
+
+
+
+		Note: fixes so far..
+			- solve contacts in order (worst depth first)
+			- solve friction then normal
+			- reversed normal
+			- fixed slop being removed from depth in some cases
+			- keep contact until depth <= 0 (rather than depth <= slop)
+			- fixed baumgarte timescale
+			- sleeping/freezing
+			- shock propagation
 	-->
 
 
@@ -203,6 +227,10 @@
 				<input id="friction" type="number" class="number" max="1.0" min="0.0" step="0.1" value="0.2" />
 				<br/>
 
+				<label for="minvel" class="option-text">Min Velocity: </label>
+				<input id="minvel" type="number" class="number" max="1.0" min="0.0" step="0.02" value="0.2" />
+				<br/>
+
 				<!-- <label for="slop" class="option-text">Slop: </label> -->
 				<!-- <input id="slop" type="number" class="number" max="0.0" min="-0.5" step="0.001" value="0.0" /> -->
 				<!-- <br/> -->
@@ -211,8 +239,6 @@
 		<div class="section">
 			<span class="section-title">Example Scenes</span>
 			<div id="examples">
-				<a href="#" id="rolling-ball" class="button">Rolling Ball</a>
-				<a href="#" id="rolling-ball2" class="button">Rolling Ball 2</a>
 			</div>
 		</div>
 	</div>

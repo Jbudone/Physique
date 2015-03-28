@@ -27,6 +27,8 @@ define(function(){
 				this.onRemovedMesh(this.meshes[meshID]);
 				delete this.meshes[meshID];
 			}
+
+			this.meshCount = 0;
 		};
 	};
 

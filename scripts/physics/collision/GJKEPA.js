@@ -202,7 +202,7 @@ define(['physics/memstore'], function(MemStore){
 							contactA.iA = contactA.i;
 							contactB.iB = contactB.i;
 
-							var norm = nearestFace.face.normal.negate();
+							var norm = nearestFace.face.normal;
 							// if (norm.dot(bodyA.position.clone().sub(bodyB.position)) < 0) {
 							// 	debugger;
 							// 	norm.negate();
