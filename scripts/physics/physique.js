@@ -15,21 +15,28 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			gravity: -10.0,
 			scaleTime: 0.001,//0.001,// 0.0002,//0.001,
 
-			slop: 0.01,//-0.0001,
-			maxDepth: 4.0, // before falling through
+			slop: 0.01,//0.001,//-0.0001,
+			maxDepth: 4.0,//0.3*0.3,//4.0, // FIXME: seems like this should be a high value, but some places (bullet) use persistentContactDistanceThreshold here
+			minDepth: 0,//-0.009, // FIXME: seems like this should be 0, why do some places (react) use a negative value here??
 			damping: 1.0,//0.95, // FIXME: needed for box stacking? .. NOTE: any dampening is making the ball rolling problem fail!
-			warmth: 1.0,
+			warmth: 0.9, // NOTE: can't use 1.0, otherwise box stack will sway.. must use a fractional value
 			baumgarte: 0.2, // FIXME: helps with faster penetration solving
 			restitution: 0.0, // FIXME: found as 0.25 in other places ... NOTE: one source suggests that this is negative!
 			friction: 0.3, // sqrt( mu1 * mu2 )  FIXME: 0.1 for better box stacking stability
 			minVel: 0.00,//0.06,
-			minToSleep: 0.01,//0.004,
-			minIterationsBeforeSleep: 20*60,//20, // NOTE: 20 minimum for ball rolling problem
+			minToSleep: 0.06,//0.01,//0.004,
+			minWakeDepth: 0.1, // NOTE: 0.04 too small
+			minIterationsBeforeSleep: 8*60,//20, // NOTE: 20 minimum for ball rolling problem
 
-			velocityIterations: 10,
+			velocityIterations: 20,
 
 			solveWorstContactsFirst: true,
-			enableIslands: true,
+			useIslands: false,
+			onlyRemoveOnePointPerStep: true,
+
+			persistentContactDistanceThreshold: 0.3,
+			closestContactDistanceThreshold: 0.002, // FIXME: find a good number..
+			contactsByFeatures: true,
 
 			maxContactsInManifold: 4,
 			runOnce: null
@@ -87,6 +94,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			this.vertexB = contact.originB;
 			this.localA = contact.localA;
 			this.localB = contact.localB;
+			this.refPoint = contact.refPoint; // midpoint between vertexA and vertexB
 			this.depth = contact.depth;
 
 			// Find a tangential basis: http://box2d.org/2014/02/computing-a-basis/
@@ -199,6 +207,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					// this.setJacobian(this.rows[0]);
 				}
 
+				if (this.depth > physique.world.minDepthToWakeUp) {
+					this.bodyA.wantToSleep = 0;
+					this.bodyB.wantToSleep = 0;
+				}
+
 
 				/*
 				this.JDiagABInv = 0;
@@ -297,7 +310,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			this.bodyA = bodyA;
 			this.bodyB = bodyB;
-			this.contacts = {};
+			this.contacts = [];
 			this.length = 0;
 
 			this.island = null;
@@ -305,6 +318,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			this.shockLevel = null;
 			this.uid = uid;
 
+			if (physique.world.contactsByFeatures) {
+				this.contactsByFeatures = {};
+			}
+
+			// FIXME: improve this
 			this.hashContactVerts = function(contact){
 				return Math.max(contact.originA.i, contact.originB.i) * 10000 + Math.min(contact.originA.i, contact.originB.i);
 			};
@@ -313,15 +331,48 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 				if (contact.depth < 0.0) return;
 				// contact.depth -= physique.world.slop;
-				var hash = this.hashContactVerts(contact);
-				contact.vHash = hash;
-				if (this.contacts.hasOwnProperty(hash)) {
-					this.contacts[hash].update(contact);
-					physique.onUpdateContact(contact.hash + hash, contact.originA);
-					physique.onUpdateContact(contact.hash + hash + 'B', contact.originB);
-				} else {
-					this.addContact(hash, contact);
+
+				var hash = null;
+				if (physique.world.contactsByFeatures) {
+					hash = this.hashContactVerts(contact);
+					contact.vHash = hash;
 				}
+
+				var closestDist = Math.pow(physique.world.closestContactDistanceThreshold, 2),
+					closestI = null;
+
+				if (physique.world.contactsByFeatures) {
+
+					if (this.contactsByFeatures.hasOwnProperty(hash)) {
+						this.contactsByFeatures[hash].update(contact);
+						physique.onUpdateContact(contact.hash + hash, contact.originA);
+						physique.onUpdateContact(contact.hash + hash + 'B', contact.originB);
+					} else {
+						this.addContact(hash, contact);
+					}
+
+				} else {
+					
+					// Find matching contact by distance
+					for (var i=0; i<this.contacts.length; ++i) {
+						// var dist = this.contacts[i].refPoint.distanceToSquared(contact.refPoint);
+						var dist = this.contacts[i].localA.distanceToSquared(contact.localA);
+
+						if (dist < closestDist) {
+							// Same point ??
+							// if (closestDist > dist) debugger; // Probably need to decrease dist if this hits more than 1 point
+							closestDist = dist;
+							closestI = i;
+						}
+					}
+
+					if (closestI != null) {
+						this.contacts[closestI].update(contact);
+					} else {
+						this.addContact(hash, contact);
+					}
+				}
+
 				
 			};
 
@@ -342,40 +393,54 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					// Replace weakest contact with this one
 					var weakestContactDepth = -99999,
 						weakestContactI = null;
-					for (var contactID in this.contacts) {
-						if (this.contacts[contactID].depth > weakestContactDepth) {
-							weakestContactDepth = this.contacts[contactID].depth;
-							weakestContact = contactID;
+					for (var i=0; i<this.contacts.length; ++i) {
+						if (this.contacts[i].depth > weakestContactDepth) {
+							weakestContactDepth = this.contacts[i].depth;
+							weakestContactI = i;
 						}
 					}
+					// for (var contactID in this.contacts) {
+					// 	if (this.contacts[contactID].depth > weakestContactDepth) {
+					// 		weakestContactDepth = this.contacts[contactID].depth;
+					// 		weakestContact = contactID;
+					// 	}
+					// }
 
-					// physique.onRemoveContact(this.contacts[contactID].uid, this.contacts[contactID].vertexA);
-					// physique.onRemoveContact(this.contacts[contactID].uid, this.contacts[contactID].vertexB);
-					physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash);
-					physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash + 'B');
-					this.contacts[contactID].remove();
-					delete this.contacts[contactID];
+					// physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash);
+					// physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash + 'B');
+					physique.onRemoveContact(this.contacts[weakestContactI].hash + weakestContactI);
+					physique.onRemoveContact(this.contacts[weakestContactI].hash + weakestContactI + 'B');
+
+					if (physique.world.contactsByFeatures) {
+						delete this.contactsByFeatures[this.contacts[weakestContactI].vHash];
+					}
+					this.contacts[weakestContactI].remove();
+					this.contacts.splice(weakestContactI, 1);
 
 					--this.length;
 				}
 
 				++this.length;
-				physique.onNewContact(contact.hash + hash, contact.originA);
-				physique.onNewContact(contact.hash + hash + 'B', contact.originB);
+				// physique.onNewContact(contact.hash + hash, contact.originA);
+				// physique.onNewContact(contact.hash + hash + 'B', contact.originB);
+				physique.onNewContact(contact.hash + i, contact.originA);
+				physique.onNewContact(contact.hash + i + 'B', contact.originB);
 				var _contact = new Contact(contact, this);
 				_contact.hash = contact.hash;
 				_contact.vHash = hash;
-				this.contacts[hash] = _contact;
+				this.contacts.push( _contact );
+
+				if (physique.world.contactsByFeatures) {
+					this.contactsByFeatures[hash] = _contact;
+				}
 			};
 
 			this.update = function(){
-				// TODO: check position of contacts (model space) to see if they're far enough away and no
-				// longer in contact:
-				// https://github.com/chandlerprall/GoblinPhysics/blob/master/src/classes/ContactManifold.js
-				// :186
 
-				for (var contactID in this.contacts) {
-					var contact = this.contacts[contactID];
+				var removedCount = 0;
+				for (var i=0; i<this.contacts.length; ++i) {
+				// for (var contactID in this.contacts) {
+					var contact = this.contacts[i];
 
 					// var worldA = contact.vertexA.clone().applyQuaternion(contact.bodyA.quaternion).add(contact.bodyA.position),
 					// 	worldB = contact.vertexB.clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position),
@@ -400,26 +465,43 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						newContactB = contact.localB.clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position),
 						newDistance = newContactA.clone().sub(newContactB).dot(contact.normal);
 
-					// var newDistance = contact.bodyA.geometry.vertices[contact.vertexA.iA].clone().applyQuaternion(contact.bodyA.quaternion).add(contact.bodyA.position).sub( contact.bodyB.geometry.vertices[contact.vertexB.iB].clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position) ).dot( contact.normal );
-					if (newDistance < 0.0 || newDistance > physique.world.maxDepth) {
-						physique.onRemoveContact(contact.hash + contact.vHash);
-						physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-						contact.remove();
-						delete this.contacts[contactID];
-						--this.length;
-						continue;
-					}
+					if (removedCount == 0 || !physique.world.onlyRemoveOnePointPerStep) {
+						// var newDistance = contact.bodyA.geometry.vertices[contact.vertexA.iA].clone().applyQuaternion(contact.bodyA.quaternion).add(contact.bodyA.position).sub( contact.bodyB.geometry.vertices[contact.vertexB.iB].clone().applyQuaternion(contact.bodyB.quaternion).add(contact.bodyB.position) ).dot( contact.normal );
+						if (newDistance < physique.world.minDepth || newDistance > physique.world.maxDepth) {
+							++removedCount;
+							// physique.onRemoveContact(contact.hash + contact.vHash);
+							// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
+							physique.onRemoveContact(contact.hash + i);
+							physique.onRemoveContact(contact.hash + i + 'B');
+							contact.remove();
+
+							if (physique.world.contactsByFeatures) {
+								delete this.contactsByFeatures[contact.vHash];
+							}
+							this.contacts.splice(i, 1);
+							--this.length;
+							continue;
+						}
 
 
-					// Contact points are too far away along the plane orthogonal to the normal axis
-					var diffBetweenPoints = newContactB.clone().sub( newContactA.clone().add( contact.normal.clone().multiplyScalar(newDistance) ) );
-					if (diffBetweenPoints.lengthSq() > 0.09) {
-						physique.onRemoveContact(contact.hash + contact.vHash);
-						physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-						contact.remove();
-						delete this.contacts[contactID];
-						--this.length;
-						continue;
+						// Contact points are too far away along the plane orthogonal to the normal axis
+						var diffBetweenPoints = newContactB.clone().sub( newContactA.clone().add( contact.normal.clone().multiplyScalar(newDistance) ) );
+						if (diffBetweenPoints.lengthSq() > (physique.world.persistentContactDistanceThreshold*physique.world.persistentContactDistanceThreshold)) {
+							++removedCount;
+							// physique.onRemoveContact(contact.hash + contact.vHash);
+							// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
+							physique.onRemoveContact(contact.hash + i);
+							physique.onRemoveContact(contact.hash + i + 'B');
+							contact.remove();
+
+							if (physique.world.contactsByFeatures) {
+								delete this.contactsByFeatures[contact.vHash];
+							}
+							this.contacts.splice(i, 1);
+							--this.length;
+							continue;
+						}
+
 					}
 
 
@@ -441,8 +523,10 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					// }
 
 					contact.depth = newDistance;
-					physique.onUpdateContact(contact.hash + contact.vHash, contact.vertexA);
-					physique.onUpdateContact(contact.hash + contact.vHash + 'B', contact.vertexB);
+					// physique.onUpdateContact(contact.hash + contact.vHash, contact.vertexA);
+					// physique.onUpdateContact(contact.hash + contact.vHash + 'B', contact.vertexB);
+					physique.onUpdateContact(contact.hash + i, contact.vertexA);
+					physique.onUpdateContact(contact.hash + i + 'B', contact.vertexB);
 
 					contact.update();
 				}
@@ -475,7 +559,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					}
 
 					if (!island) {
-						island = new Island(contact.hash);
+						island = new Island();
 						islands[island.uid] = island;
 					}
 
@@ -501,16 +585,52 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				manifold.bodyA.removeManifold(manifold);
 				manifold.bodyB.removeManifold(manifold);
 				if (this.world.useIslands && manifold.island) {
-					manifold.island.removeManifold(manifold);
+					var disconnected = manifold.island.removeManifold(manifold);
 					if (manifold.island.count == 0) {
 						delete islands[manifold.island.uid];
 					}
+
+					if (disconnected) {
+
+						for (var i=0; i<disconnected.length; ++i) {
+
+							var manifold = disconnected[i],
+								island = null;
+							if (!manifold.bodyA.island || !manifold.bodyB.island) {
+								if (!manifold.bodyA.island && !manifold.bodyB.island) {
+									// Neither bodies belong to an island yet
+								} else if (!manifold.bodyA.island) {
+									manifold.bodyA.island = manifold.bodyB.island;
+								} else {
+									manifold.bodyB.island = manifold.bodyA.island;
+								}
+								island = manifold.bodyA.island;
+							} else if (manifold.bodyA.island == manifold.bodyB.island) {
+								island = manifold.bodyA.island;
+							} else {
+								// Both bodies belong to different islands..need to merge the islands
+								island = manifold.bodyA.island.mergeWith( manifold.bodyB.island );
+							}
+
+							if (!island) {
+								island = new Island();
+								islands[island.uid] = island;
+							}
+							island.addManifold(manifold);
+
+						}
+
+					}
 				}
 
-				for (var contactID in manifold.contacts) {
-					var contact = manifold.contacts[contactID];
-					physique.onRemoveContact(contact.hash + contact.vHash);
-					physique.onRemoveContact(contact.hash + contact.vHash + 'B');
+				for (var i=0; i<manifold.contacts.length; ++i) {
+				// for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[i];
+					// physique.onRemoveContact(contact.hash + contact.vHash);
+					// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
+					physique.onRemoveContact(contact.hash + i);
+					physique.onRemoveContact(contact.hash + i + 'B');
+					contact.remove();
 				}
 				delete contactManifolds[hash];
 			}
@@ -523,7 +643,44 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				manifold.update();
 
 				if (_.isEmpty(manifold.contacts)) {
-					if (this.world.useIslands && manifold.island) manifold.island.removeManifold(manifold);
+					if (this.world.useIslands && manifold.island) {
+						var disconnected = manifold.island.removeManifold(manifold);
+
+						if (manifold.island && manifold.island.count === 0) {
+							delete islands[manifold.island.uid];
+						}
+
+						if (disconnected) {
+
+							for (var i=0; i<disconnected.length; ++i) {
+
+								var manifold = disconnected[i],
+									island = null;
+								if (!manifold.bodyA.island || !manifold.bodyB.island) {
+									if (!manifold.bodyA.island && !manifold.bodyB.island) {
+										// Neither bodies belong to an island yet
+									} else if (!manifold.bodyA.island) {
+										manifold.bodyA.island = manifold.bodyB.island;
+									} else {
+										manifold.bodyB.island = manifold.bodyA.island;
+									}
+									island = manifold.bodyA.island;
+								} else if (manifold.bodyA.island == manifold.bodyB.island) {
+									island = manifold.bodyA.island;
+								} else {
+									// Both bodies belong to different islands..need to merge the islands
+									island = manifold.bodyA.island.mergeWith( manifold.bodyB.island );
+								}
+
+								if (!island) {
+									island = new Island();
+									islands[island.uid] = island;
+								}
+								island.addManifold(manifold);
+
+							}
+						}
+					}
 					delete contactManifolds[manifoldID];
 				}
 			}
@@ -534,9 +691,10 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			for (var manifoldID in contactManifolds) {
 
 				var manifold = contactManifolds[manifoldID];
-				for (var contactID in manifold.contacts) {
+				for (var i=0; i<manifold.contacts.length; ++i) {
+				// for (var contactID in manifold.contacts) {
 
-					var contact = manifold.contacts[contactID];
+					var contact = manifold.contacts[i];
 
 					if ((contact.bodyA.asleep || contact.bodyA.static) && (contact.bodyB.asleep || contact.bodyB.static)) {
 						continue;
@@ -572,6 +730,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulseT2) );
 
 
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
 
 
 					contact.appliedPushImpulse = 0;
@@ -592,7 +752,62 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			if (this.world.useIslands) {
 
-			var TEST_ENABLE_SHOCK_REWEIGHT = true;
+				var TEST_UNOPTIMIZED_ISLANDS = false;
+				if (TEST_UNOPTIMIZED_ISLANDS) {
+					islands = {};
+					
+					var manifoldsToAdd = [];
+					for (var manifoldID in contactManifolds) {
+						var manifold = contactManifolds[manifoldID];
+						manifoldsToAdd.push( manifold );
+
+						manifold.shockLevel = null;
+						manifold.island = null;
+						manifold.bodyA.island = null;
+						manifold.bodyB.island = null;
+					}
+
+					while (manifoldsToAdd.length) {
+						var manifold = manifoldsToAdd[0];
+						manifoldsToAdd.splice(0, 1);
+
+						var island = null;
+						if (!manifold.bodyA.island || !manifold.bodyB.island) {
+							if (!manifold.bodyA.island && !manifold.bodyB.island) {
+								// Neither bodies belong to an island yet
+							} else if (!manifold.bodyA.island) {
+								manifold.bodyA.island = manifold.bodyB.island;
+							} else {
+								manifold.bodyB.island = manifold.bodyA.island;
+							}
+							island = manifold.bodyA.island;
+						} else if (manifold.bodyA.island == manifold.bodyB.island) {
+							island = manifold.bodyA.island;
+						} else {
+							// Both bodies belong to different islands..need to merge the islands
+							island = manifold.bodyA.island.mergeWith( manifold.bodyB.island );
+						}
+
+						if (!island) {
+							var island = new Island();
+							islands[island.uid] = island;
+							manifold.island = island;
+							manifold.bodyA.island = island;
+							manifold.bodyB.island = island;
+						}
+
+						island.addManifold(manifold);
+
+						for (var eIslandID in islands) {
+							if (islands[eIslandID].count == 0) {
+								// In case we merged with this island..
+								delete islands[eIslandID];
+							}
+						}
+					}
+				}
+
+			var TEST_ENABLE_SHOCK_REWEIGHT = false;
 
 					for (var iteration=0; iteration<physique.world.velocityIterations; ++iteration) {
 					for (var islandID in islands) {
@@ -601,6 +816,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						
 							if (TEST_ENABLE_SHOCK_REWEIGHT) {
 								if (shockLevel>0) {
+									if (!island.manifolds[shockLevel-1]) continue;
 									for (var mI=0; mI<island.manifolds[shockLevel-1].length; ++mI) {
 										var manifold = island.manifolds[shockLevel-1][mI];
 
@@ -622,6 +838,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 								}
 							}
 
+							if (!island.manifolds[shockLevel]) continue;
+
 							for (var manifoldI=0; manifoldI<island.manifolds[shockLevel].length; ++manifoldI) {
 								var manifold = island.manifolds[shockLevel][manifoldI];
 							// for (var manifoldID in contactManifolds) {
@@ -630,12 +848,13 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 								if (physique.world.solveWorstContactsFirst) {
 									var contacts = [];
-									for (var contactID in manifold.contacts) {
-										var contact = manifold.contacts[contactID];
+									for (var i=0; i<manifold.contacts.length; ++i) {
+									// for (var contactID in manifold.contacts) {
+										var contact = manifold.contacts[i];
 										var ith = contacts.length;
-										for (var i=0; i<contacts.length; ++i) {
-											if (contact.depth < contacts[i].depth) {
-												ith = i;
+										for (var j=0; j<contacts.length; ++j) {
+											if (contact.depth < contacts[j].depth) {
+												ith = j;
 												break;
 											}
 										}
@@ -647,9 +866,10 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 										this.solveContact(contact);
 									}
 								} else {
-									for (var contactID in manifold.contacts) {
+									for (var i=0; i<manifold.contacts.length; ++i) {
+									// for (var contactID in manifold.contacts) {
 
-										var contact = manifold.contacts[contactID];
+										var contact = manifold.contacts[i];
 										this.solveContact(contact);
 									}
 								}
@@ -658,6 +878,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					if (TEST_ENABLE_SHOCK_REWEIGHT) {
 						for (var shockLevel=0; shockLevel<island.manifolds.length; ++shockLevel) {
 						
+							if (!island.manifolds[shockLevel]) continue;
 							for (var mI=0; mI<island.manifolds[shockLevel].length; ++mI) {
 								var manifold = island.manifolds[shockLevel][mI];
 								if (manifold.bodyA.hasOwnProperty('storedInvMass')) {
@@ -686,12 +907,13 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 						if (physique.world.solveWorstContactsFirst) {
 							var contacts = [];
-							for (var contactID in manifold.contacts) {
-								var contact = manifold.contacts[contactID];
+							for (var i=0; i<manifold.contacts.length; ++i) {
+							// for (var contactID in manifold.contacts) {
+								var contact = manifold.contacts[i];
 								var ith = contacts.length;
-								for (var i=0; i<contacts.length; ++i) {
-									if (contact.depth < contacts[i].depth) {
-										ith = i;
+								for (var j=0; j<contacts.length; ++j) {
+									if (contact.depth < contacts[j].depth) {
+										ith = j;
 										break;
 									}
 								}
@@ -703,9 +925,10 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 								this.solveContact(contact);
 							}
 						} else {
-							for (var contactID in manifold.contacts) {
+							for (var i=0; i<manifold.contacts.length; ++i) {
+							// for (var contactID in manifold.contacts) {
 
-								var contact = manifold.contacts[contactID];
+								var contact = manifold.contacts[i];
 								this.solveContact(contact);
 							}
 						}
@@ -714,44 +937,14 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			}
 
-
-					/*
-			for (var manifoldID in contactManifolds) {
-
-				var manifold = contactManifolds[manifoldID];
-				for (var contactID in manifold.contacts) {
-
-					var contact = manifold.contacts[contactID];
-
-					if ((contact.bodyA.asleep || contact.bodyA.static) && (contact.bodyB.asleep || contact.bodyB.static)) {
-						continue;
-					}
-					var rA = contact.vertexA.clone().sub(contact.bodyA.position),
-						rB = contact.vertexB.clone().sub(contact.bodyB.position),
-						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-					dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
-
-					var deltaVDotN = -dV.dot(contact.normal),
-						JV = deltaVDotN;
-
-					var b = (contact.depth - physique.world.slop) * (physique.world.baumgarte * (60)) - JV * physique.world.restitution; // TODO: restitution
-
-					// ReactPhysics way
-					// Warmstart
-					var rA = contact.vertexA.clone().sub(contact.bodyA.position),
-						rB = contact.vertexB.clone().sub(contact.bodyB.position);
-					contact.bodyA.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * (b - JV)) );
-					contact.bodyA.angularVelocity.add( rA.clone().cross(contact.normal).multiplyScalar(contact.bodyA.invInertiaTensor * (b - JV)) );
-
-					contact.bodyB.velocity.sub( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * (b - JV)) );
-					contact.bodyB.angularVelocity.sub( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * (b - JV)) );
-				}
-			}
-			*/
 		};
 
 
 		this.solveContact = function(contact){
+
+			if ((contact.bodyA.static || contact.bodyA.asleep) &&
+				(contact.bodyB.static || contact.bodyB.asleep)) return;
+
 						var row = contact.rows[0], // contact constraint
 							JdotV = 0,
 							delta = 0;
@@ -782,22 +975,24 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							friction2Mass = 0.0;
 						MA = 0;
 						if (contact.bodyA.invMass !== 0) {
-							var mass = contact.bodyA.invMass,
-								iner = contact.bodyA.invInertiaTensor,
-								tang = contact.tangent1.clone(),
-								rv   = rA.clone().cross(tang);
-							MA = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							// var mass = contact.bodyA.invMass,
+							// 	iner = contact.bodyA.invInertiaTensor,
+							// 	tang = contact.tangent1.clone(),
+							// 	rv   = rA.clone().cross(tang);
+							// MA = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							// MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.tangent1).cross(rA)).dot(contact.tangent1);
 						}
 
 						MB = 0;
 						if (contact.bodyB.invMass !== 0) {
-							var mass = contact.bodyB.invMass,
-								iner = contact.bodyB.invInertiaTensor,
-								tang = contact.tangent1.clone(),
-								rv   = rB.clone().cross(tang);
-							MA = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							// var mass = contact.bodyB.invMass,
+							// 	iner = contact.bodyB.invInertiaTensor,
+							// 	tang = contact.tangent1.clone(),
+							// 	rv   = rB.clone().cross(tang);
+							// MB = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							// MB += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.tangent1).cross(rB)).dot(contact.tangent1);
 						}
 
 						deltaLambda = -JV / (MA + MB);
@@ -824,22 +1019,24 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							friction2Mass = 0.0;
 						MA = 0;
 						if (contact.bodyA.invMass !== 0) {
-							var mass = contact.bodyA.invMass,
-								iner = contact.bodyA.invInertiaTensor,
-								tang = contact.tangent2.clone(),
-								rv   = rA.clone().cross(tang);
-							MA = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							// var mass = contact.bodyA.invMass,
+							// 	iner = contact.bodyA.invInertiaTensor,
+							// 	tang = contact.tangent2.clone(),
+							// 	rv   = rA.clone().cross(tang);
+							// MA = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							// MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.tangent2).cross(rA)).dot(contact.tangent2);
 						}
 
 						MB = 0;
 						if (contact.bodyB.invMass !== 0) {
-							var mass = contact.bodyB.invMass,
-								iner = contact.bodyB.invInertiaTensor,
-								tang = contact.tangent2.clone(),
-								rv   = rB.clone().cross(tang);
-							MA = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							// var mass = contact.bodyB.invMass,
+							// 	iner = contact.bodyB.invInertiaTensor,
+							// 	tang = contact.tangent2.clone(),
+							// 	rv   = rB.clone().cross(tang);
+							// MB = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
+							// MB += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
+							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.tangent2).cross(rB)).dot(contact.tangent2);
 						}
 
 						deltaLambda = -JV / (MA + MB);
@@ -877,8 +1074,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						var MA = 0, MB = 0;
 						if (contact.bodyA.invMass !== 0) {
 							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate()).cross(rA)).dot(contact.normal.clone().negate());
-							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal).cross(rA)).dot(contact.normal);
-							MA = contact.bodyA.invMass + (rA.clone().multiplyScalar(contact.bodyA.invInertiaTensor).cross(contact.normal).cross(rA)).dot(contact.normal);
+							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal).cross(rA)).dot(contact.normal);
+							// MA = contact.bodyA.invMass + (rA.clone().multiplyScalar(contact.bodyA.invInertiaTensor).cross(contact.normal).cross(rA)).dot(contact.normal);
 							// MA = contact.bodyA.invMass + (contact.vertexA.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyA.invInertiaTensor)).cross(contact.vertexA).dot(contact.normal.clone().negate());
 							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (contact.vertexA.clone().cross(contact.normal.clone().negate())).cross(contact.vertexA).dot(contact.normal.clone().negate());
 							// var mass = contact.bodyA.invMass,
@@ -892,8 +1089,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						}
 						if (contact.bodyB.invMass !== 0) {
 							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate()).cross(rB)).dot(contact.normal.clone().negate());
-							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal).cross(rB)).dot(contact.normal);
-							MB = contact.bodyB.invMass + (rB.clone().multiplyScalar(contact.bodyB.invInertiaTensor).cross(contact.normal).cross(rB)).dot(contact.normal);
+							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal).cross(rB)).dot(contact.normal);
+							// MB = contact.bodyB.invMass + (rB.clone().multiplyScalar(contact.bodyB.invInertiaTensor).cross(contact.normal).cross(rB)).dot(contact.normal);
 							// MB = contact.bodyB.invMass + (contact.vertexB.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyB.invInertiaTensor)).cross(contact.vertexB).dot(contact.normal.clone().negate());
 							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (contact.vertexB.clone().cross(contact.normal.clone().negate())).cross(contact.vertexB).dot(contact.normal.clone().negate());
 							// var mass = contact.bodyB.invMass,
@@ -921,6 +1118,10 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						contact.bodyB.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
 						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
 
+
+
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
 		};
 
 
@@ -937,11 +1138,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				var manifold = body.manifolds[manifoldID];
 				if (manifold.island) manifold.island.removeManifold(manifold);
 
-				for (var contactID in manifold.contacts) {
-					var contact = manifold.contacts[contactID];
-					physique.onRemoveContact(contact.hash + contact.vHash);
-					physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-					delete manifold.contacts[contactID];
+				for (var i=0; i<manifold.contacts.length; ++i) {
+				// for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[i];
+					physique.onRemoveContact(contact.hash + i);
+					physique.onRemoveContact(contact.hash + i + 'B');
+					manifold.contacts.splice(i, 1);
 				}
 
 				delete manifold.bodyA.manifolds[manifoldID];
@@ -963,7 +1165,9 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			var bodyType = mesh.settings.body;
 			if (bodyType === BODY_CUBE) {
 
-				var _inertia = 1/12 * mass * (2*2 + 2*2);
+				var extent = 2; // FIXME: assuming a cube (same width/height/depth)
+				// FIXME: giving cube more inertia by doubling its extent... this seems to help in box stacking
+				var _inertia = 1/12 * mass * (2*extent*extent);
 				mesh.body.invMass = 1 / (mass);
 				mesh.body.invInertiaTensor = 1 / (_inertia);
 				mesh.body.static = false;
@@ -1087,6 +1291,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				} else if (body.userMoved) {
 					body.userMoved = false;
 					body.asleep = false;
+					body.wantToSleep = 0;
 					Broadphase.updateAABB(body);
 					Broadphase.updateBodyInBroadphase(body);
 				}
@@ -1112,8 +1317,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					continue;
 				}
 
-				if (bodyA.asleep) {
+				var minDepthToWakeUp = (contactManifolds.hasOwnProperty(hitHash) ? this.world.minWakeDepth : 0.0); // Only consider waking up the body IF this is a new contact pair OR if the penetration depth is big enough
+				if (bodyA.asleep && contact.depth > minDepthToWakeUp) {
 					bodyA.asleep = false;
+					bodyA.wantToSleep = 0;
+					bodyA.invMass = bodyA.storedInvMass;
+					bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
 					if (bodyA.material.hasOwnProperty('storedColor')) {
 						bodyA.material.color.r = bodyA.material.storedColor.r;
 						bodyA.material.color.g = bodyA.material.storedColor.g;
@@ -1122,8 +1331,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					}
 				}
 
-				if (bodyB.asleep) {
+				if (bodyB.asleep && contact.depth > minDepthToWakeUp) {
 					bodyB.asleep = false;
+					bodyB.wantToSleep = 0;
+					bodyB.invMass = bodyB.storedInvMass;
+					bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
 					if (bodyB.material.hasOwnProperty('storedColor')) {
 						bodyB.material.color.r = bodyB.material.storedColor.r;
 						bodyB.material.color.g = bodyB.material.storedColor.g;
@@ -1185,7 +1397,14 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						var oldHit = oldHits[oldHitHash],
 							bodyA = oldHit.bodyA,
 							bodyB = oldHit.bodyB;
+
 						if (bodyA.material.hasOwnProperty('storedColor')) {
+							if (bodyA.asleep) {
+								bodyA.asleep = false;
+								bodyA.wantToSleep = 0;
+								bodyA.invMass = bodyA.storedInvMass;
+								bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
+							}
 							bodyA.material.color.r = bodyA.material.storedColor.r;
 							bodyA.material.color.g = bodyA.material.storedColor.g;
 							bodyA.material.color.b = bodyA.material.storedColor.b;
@@ -1193,6 +1412,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						}
 
 						if (bodyB.material.hasOwnProperty('storedColor')) {
+							if (bodyB.asleep) {
+								bodyB.asleep = false;
+								bodyB.wantToSleep = 0;
+								bodyB.invMass          = bodyB.storedInvMass;
+								bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
+							}
 							bodyB.material.color.r = bodyB.material.storedColor.r;
 							bodyB.material.color.g = bodyB.material.storedColor.g;
 							bodyB.material.color.b = bodyB.material.storedColor.b;
@@ -1239,6 +1464,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					body.position.y += scale * body.velocity.y * dt;
 					body.position.z += scale * body.velocity.z * dt;
 
+					if (isNaN(body.position.x)) debugger;
+
 					var v = (new THREE.Vector3(body.angularVelocity.x * angularScale.x, body.angularVelocity.y * angularScale.y, body.angularVelocity.z * angularScale.z)).multiplyScalar(dt).multiplyScalar(scale);
 					// 	e = (new THREE.Euler()).setFromVector3(v),
 					// 	q = (new THREE.Quaternion()).setFromEuler(e);
@@ -1263,26 +1490,42 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						body.angularVelocity.multiplyScalar(damping);
 					}
 
-					var epsV = this.world.minVel;
-					if (Math.abs(body.velocity.x) < epsV) body.velocity.x = 0;
-					if (Math.abs(body.velocity.y) < epsV) body.velocity.y = 0;
-					if (Math.abs(body.velocity.z) < epsV) body.velocity.z = 0;
-					if (Math.abs(body.angularVelocity.x) < epsV) body.angularVelocity.x = 0;
-					if (Math.abs(body.angularVelocity.y) < epsV) body.angularVelocity.y = 0;
-					if (Math.abs(body.angularVelocity.z) < epsV) body.angularVelocity.z = 0;
+					// var epsV = this.world.minVel;
+					// if (Math.abs(body.velocity.x) < epsV) body.velocity.x = 0;
+					// if (Math.abs(body.velocity.y) < epsV) body.velocity.y = 0;
+					// if (Math.abs(body.velocity.z) < epsV) body.velocity.z = 0;
+					// if (Math.abs(body.angularVelocity.x) < epsV) body.angularVelocity.x = 0;
+					// if (Math.abs(body.angularVelocity.y) < epsV) body.angularVelocity.y = 0;
+					// if (Math.abs(body.angularVelocity.z) < epsV) body.angularVelocity.z = 0;
+					var epsV = this.world.minVel,
+						v = body.velocity.lengthSq(),
+						av = body.angularVelocity.lengthSq();
+					if (v < epsV*epsV) {
+						body.velocity.multiplyScalar(0.0);
+					}
+					if (av < epsV*epsV) {
+						body.angularVelocity.multiplyScalar(0.0);
+					}
 
 					var epsVSleep = this.world.minToSleep;
-					if (Math.abs(body.velocity.x) < epsVSleep &&
-						Math.abs(body.velocity.y) < epsVSleep &&
-						Math.abs(body.velocity.z) < epsVSleep &&
-						Math.abs(body.angularVelocity.x) < epsVSleep &&
-						Math.abs(body.angularVelocity.y) < epsVSleep &&
-						Math.abs(body.angularVelocity.z) < epsVSleep) {
+					if (v < epsVSleep*epsVSleep && av < epsVSleep*epsVSleep) {
+					// if (Math.abs(body.velocity.x) < epsVSleep &&
+					// 	Math.abs(body.velocity.y) < epsVSleep &&
+					// 	Math.abs(body.velocity.z) < epsVSleep &&
+					// 	Math.abs(body.angularVelocity.x) < epsVSleep &&
+					// 	Math.abs(body.angularVelocity.y) < epsVSleep &&
+					// 	Math.abs(body.angularVelocity.z) < epsVSleep) {
 							++body.wantToSleep;
 
 							if (body.wantToSleep >= this.world.minIterationsBeforeSleep) {
 								body.wantToSleep = 0;
 								body.asleep = true;
+								body.storedInvMass = body.invMass;
+								body.storedInvInertiaTensor = body.invInertiaTensor;
+								body.invMass = 0;
+								body.invInertiaTensor = 0;
+								body.velocity.multiplyScalar(0.0);
+								body.angularVelocity.multiplyScalar(0.0);
 
 								if (!body.static) {
 									body.material.color.r = body.uid % 2 == 0 ? 0.2 : 0.4;

@@ -34,6 +34,8 @@
 				- look into GJK penetration & margins: http://hacktank.net/blog/?p=129
 				- look into GJK early-out: why do people claim that GJK can finish without being a tetrahedron? (pg. 159 of Collision Detection / 3d Environments book)
 				- continuous collision detection (extend support function from initial position of body to end position of body)
+				- improve feature points (using correctly)?
+				- GDC2010 Erwin Coumans Contacts (particularly internal edges, normal perturbations, maximize contact area)
 			- EPA
 				- DEBUG: draw contact points (turn colliding meshes transparent); draw contact normals; draw penetration depth (line from start to end to show precise contact area)
 				- Look into Goblin Physics silhouette algorithm (efficiency)
@@ -84,16 +86,24 @@
 		- Order of algorithm (applying force, damping velocity, applying impulses, etc.)
 		- dt / inv_dt... 
 		- mass has no effect?
+		- better sleeping
 
 	Fixup (GDC2006)
-		- Change penetration depth, normal, etc. to meet the accepted standard, then compare algorithms (positives/negatives)
-			- physique:407 ?? (delete too early?) ... should only delete contact when depth > 0 (not > slop)
-		- Slop should only be applied during bias calculation
-		- solve friction and then normal
+		- Check if deleting too early (depth <= 0, distance > 0.09) ?
+		- Check GDC2006!
+		- Check margin/distance depth (negative depth?) - if max depth is 0.09 instead of 0.009 then causes artifacts, perhaps need to modify baumgarte term for negative depth?
+		- Check feature points correct?
 
 
 
 		Note: fixes so far..
+			- increase 10 iterations (they say min. 10 for 5 boxes)
+			- fixed friction effective mass
+			- adjusting min (and max?) depth before removal of contact point
+			- fixed box inertia
+			- remove max one contact per step
+			- improved freezing/sleeping (wake when necessary)
+
 			- solve contacts in order (worst depth first)
 			- solve friction then normal
 			- reversed normal
@@ -101,7 +111,6 @@
 			- keep contact until depth <= 0 (rather than depth <= slop)
 			- fixed baumgarte timescale
 			- sleeping/freezing
-			- shock propagation
 	-->
 
 
@@ -168,28 +177,7 @@
 		<div class="section">
 			<span class="section-title">Physics Controls</span>
 			<div class="details">
-				<input id="objectsInput" list="objects" name="object">
-				<datalist id="objects">
-				</datalist>
-				<span class=option-text">Meshes</span>
 				<br/>
-
-				<input id="rotX" type="range" value="0" min="-314.1" max="314.1" />
-				<span class="option-text">Rotate X</span>
-
-				<br/>
-
-				<input id="rotY" type="range" value="0" min="-314.1" max="314.1" />
-				<span class="option-text">Rotate Y</span>
-
-				<br/>
-
-				<input id="rotZ" type="range" value="0" min="-314.1" max="314.1" />
-				<span class="option-text">Rotate Z</span>
-
-				<br/>
-				<br/>
-
 				<div id="controls">
 					<a href="#" id="stopPhysics"  class="button">STOP</a>
 					<a href="#" id="stepPhysics"  class="button">STEP</a>
@@ -203,36 +191,36 @@
 		<div class="section">
 			<span class="section-title">World Properties</span>
 			<div class="details">
-				<label for="scaleTime" class="option-text">Scale Time: </label>
 				<input id="scaleTime" type="number" class="number" max="0.002" min="0.0001" step="0.0001" value="0.0001" />
+				<label for="scaleTime" class="option-text">Scale Time: </label>
 				<br/>
 
-				<label for="baumgarte" class="option-text">Baumgarte: </label>
 				<input id="baumgarte" type="number" class="number" max="1.0" min="0.0" step="0.1" value="0.1" />
+				<label for="baumgarte" class="option-text">Baumgarte: </label>
 				<br/>
 
-				<label for="damping" class="option-text">Velocity Dampening: </label>
 				<input id="damping" type="number" class="number" max="1.0" min="0.0" step="0.1" value="1.0" />
+				<label for="damping" class="option-text">Velocity Dampening: </label>
 				<br/>
 
-				<label for="warmth" class="option-text">Warmstart Multiplier: </label>
 				<input id="warmth" type="number" class="number" max="1.0" min="0.0" step="0.1" value="1.0" />
+				<label for="warmth" class="option-text">Warmstart Multiplier: </label>
 				<br/>
 
-				<label for="restitution" class="option-text">Restitution: </label>
 				<input id="restitution" type="number" class="number" max="1.0" min="0.0" step="0.1" value="0.0" />
+				<label for="restitution" class="option-text">Restitution: </label>
 				<br/>
 
-				<label for="friction" class="option-text">Friction: </label>
 				<input id="friction" type="number" class="number" max="1.0" min="0.0" step="0.1" value="0.2" />
+				<label for="friction" class="option-text">Friction: </label>
 				<br/>
 
-				<label for="minvel" class="option-text">Min Velocity: </label>
 				<input id="minvel" type="number" class="number" max="1.0" min="0.0" step="0.02" value="0.2" />
+				<label for="minvel" class="option-text">Min Velocity: </label>
 				<br/>
 
-				<!-- <label for="slop" class="option-text">Slop: </label> -->
 				<!-- <input id="slop" type="number" class="number" max="0.0" min="-0.5" step="0.001" value="0.0" /> -->
+				<!-- <label for="slop" class="option-text">Slop: </label> -->
 				<!-- <br/> -->
 			</div>
 		</div>

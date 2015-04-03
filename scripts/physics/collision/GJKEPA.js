@@ -219,6 +219,7 @@ define(['physics/memstore'], function(MemStore){
 							return {
 								originA: contactA,
 								originB: contactB,
+								refPoint: contact,
 
 								localA: localA,
 								localB: localB,

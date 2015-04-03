@@ -31,6 +31,12 @@ html, body {
 	display: block;
 }
 
+.option-text {
+	width: 100%;
+	display: block;
+	margin-bottom: -17px;
+}
+
 .button {
 	border: none;
 	background: rgba(255, 255, 255, 0.7);
@@ -49,6 +55,21 @@ html, body {
 
 .button:hover {
 	background: rgba(255, 255, 255, 0.9);
+}
+
+.button-link {
+	text-decoration: none;
+	color: #FFB7B7;
+	font-weight: bold;
+	font-family: georgia;
+	padding: 1px;
+	display: block;
+}
+
+.button-link:hover {
+	color: #FF5757;
+	font-size: 18px;
+	padding: 0px;
 }
 
 
@@ -70,4 +91,5 @@ html, body {
 	font-family: georgia;
 	font-size: 16px;
 	text-align: center;
+	float: right;
 }

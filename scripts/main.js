@@ -22,7 +22,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			offsetYOfObjects: 1.5,
 			debugPoints: false,
 			maxTime: 600,
-			stepTime: 16 // 1/60th second * 1000ms/s = 16ms
+			stepTime: 16 // 1/60th second * 1000ms/s = 16.6ms
 	};
 
 	THREE.Euler.prototype.sub = function(vec){
@@ -180,39 +180,6 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 				scene.reset();
 			};
 
-			var shootCube = function(){
-
-				var mesh = scene.addMesh({
-					type: MESH_BOX,
-					body: BODY_CUBE,
-					position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
-				});
-
-				var shootMultiplier = 20.0;
-				var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
-
-				var qX = new THREE.Quaternion(),
-					qY = new THREE.Quaternion(),
-					qZ = new THREE.Quaternion(),
-					m = new THREE.Matrix4(),
-					vY = new THREE.Vector3(0,1,0),
-					vX = new THREE.Vector3(1,0,0),
-					vZ = new THREE.Vector3(0,0,1);
-
-				qX.setFromAxisAngle( vY, -renderer.camera.phi );
-				vX.applyQuaternion(qX);
-				qY.setFromAxisAngle( vX, -renderer.camera.theta );
-				vY.multiply(qY);
-				qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
-				qY.multiply(qX);
-				qY.multiply(qZ);
-
-				moveDir2.applyQuaternion(qY);
-
-				mesh.body.velocity.add(moveDir2);
-
-			};
-
 			resetScene();
 			startScene();
 
@@ -225,7 +192,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		};
 
 		var addScene = function(name, title){
-			var _exampleEl = $('<a/>').attr('href', '#').addClass('button').text(title).click(function(){
+			var _exampleEl = $('<a/>').attr('href', '#').addClass('button-link').text(title).click(function(){
 				loadScene(name);
 				return false;
 			});
@@ -244,6 +211,41 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		console.error(error);
 		console.error(error.stack);
 	});
+
+
+
+	var shootCube = function(){
+
+		var mesh = scene.addMesh({
+			type: MESH_BOX,
+			body: BODY_CUBE,
+			position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
+		});
+
+		var shootMultiplier = 20.0;
+		var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
+
+		var qX = new THREE.Quaternion(),
+			qY = new THREE.Quaternion(),
+			qZ = new THREE.Quaternion(),
+			m = new THREE.Matrix4(),
+			vY = new THREE.Vector3(0,1,0),
+			vX = new THREE.Vector3(1,0,0),
+			vZ = new THREE.Vector3(0,0,1);
+
+		qX.setFromAxisAngle( vY, -renderer.camera.phi );
+		vX.applyQuaternion(qX);
+		qY.setFromAxisAngle( vX, -renderer.camera.theta );
+		vY.multiply(qY);
+		qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
+		qY.multiply(qX);
+		qY.multiply(qZ);
+
+		moveDir2.applyQuaternion(qY);
+
+		mesh.body.velocity.add(moveDir2);
+
+	};
 
 
 	document.addEventListener('keydown', function KeyDownEvent(evt){

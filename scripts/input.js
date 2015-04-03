@@ -32,6 +32,8 @@ define(function(){
 		raycaster = null;
 
 
+	var moveScale = 0.2,
+		runScale  = 4.0;
 	var step = function(){
 		if (UI.viewport.isMoving) {
 
@@ -71,8 +73,8 @@ define(function(){
 
 			// Are we running?
 			//move.x *= -1;
-			if ( movement & MOVE_RUNNING ) move.multiplyScalar(-2.0*UI.viewport.scaleMove);
-			else move.multiplyScalar(-1.0*UI.viewport.scaleMove);
+			if ( movement & MOVE_RUNNING ) move.multiplyScalar(-1.0*runScale*UI.viewport.scaleMove);
+			else move.multiplyScalar(-1.0*moveScale*UI.viewport.scaleMove);
 
 			// Apply the movement
 			camera.position.add(move);
@@ -91,7 +93,6 @@ define(function(){
 
 		canvas.addEventListener('mousedown', function MouseDownEvent(evt){
 
-			console.log("Mouse down! " + evt.button);
 			var bounds  = canvas.getBoundingClientRect(),
 				mouseY  = evt.clientY - bounds.top,
 				mouseX  = evt.clientX - bounds.left;
