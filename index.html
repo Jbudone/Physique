@@ -72,9 +72,10 @@
 
 
 
+	* Mouse constraint
 	* Sleep mode; realistic timing + delta + settings
-	* Stable box stacking
 	* Speed improvements
+	* Profiling: profiler to start and stop w/ a given label, then adds the total time on ending to the mean/min/max for that label
 	* FIXME: effective mass of friction for each contact (different than effective mass of penetration)
 	* Reset scene
 	
@@ -93,6 +94,7 @@
 		- Check GDC2006!
 		- Check margin/distance depth (negative depth?) - if max depth is 0.09 instead of 0.009 then causes artifacts, perhaps need to modify baumgarte term for negative depth?
 		- Check feature points correct?
+		- Islands: list all unchecked manifolds, then starting from static objects loop through all neighbours and set shock propagation level if not set yet OR if new shock < this shock. Each traversal results in a new island. Any leftover objects belong to a separate island (no shock level)
 
 
 

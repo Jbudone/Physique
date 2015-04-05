@@ -400,11 +400,22 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 					for (var i=0; i<intersects.length; ++i) {
 						var intersect = intersects[i];
 						if (intersect.object.static === false) {
+							if (activeMesh) {
+								activeMesh.static = false;
+								activeMesh.invMass = activeMesh.storedInvMass;
+								activeMesh.invInertiaTensor = activeMesh.storedInvInertiaTensor;
+								if (activeMesh.invMass == 0) debugger;
+							}
+
 							activeMesh = intersect.object;
 							activeMesh.distanceFromCamera = intersect.distance;
 							raycaster.holdingOnto = activeMesh;
 							activeMesh.velocity.multiplyScalar(0.0);
 							activeMesh.angularVelocity.multiplyScalar(0.0);
+							activeMesh.storedInvMass = activeMesh.invMass;
+							activeMesh.storedInvInertiaTensor = activeMesh.invInertiaTensor;
+							activeMesh.invMass = 0.0;
+							activeMesh.invInertiaTensor = 0.0;
 							raycaster.holdingOnto.static = true;
 							break;
 						}

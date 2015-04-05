@@ -28,15 +28,15 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			minWakeDepth: 0.1, // NOTE: 0.04 too small
 			minIterationsBeforeSleep: 8*60,//20, // NOTE: 20 minimum for ball rolling problem
 
-			velocityIterations: 20,
+			velocityIterations: 10,
 
 			solveWorstContactsFirst: true,
 			useIslands: false,
 			onlyRemoveOnePointPerStep: true,
 
 			persistentContactDistanceThreshold: 0.3,
-			closestContactDistanceThreshold: 0.002, // FIXME: find a good number..
-			contactsByFeatures: true,
+			closestContactDistanceThreshold: 0.001, // FIXME: find a good number..
+			contactsByFeatures: false,
 
 			maxContactsInManifold: 4,
 			runOnce: null
@@ -749,17 +749,45 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			}
 
 
+			var island_count = 0;
+			var Island2 = function(){
+				this.uid = (++island_count);
+				this.manifolds = [];
 
-			if (this.world.useIslands) {
+				this.addManifold = function(manifold, shockLevel){
+					if (!this.manifolds[shockLevel]) this.manifolds[shockLevel] = [];
+					this.manifolds[shockLevel].push(manifold);
+					manifold.shockLevel = shockLevel;
+					manifold.indexInIsland = this.manifolds[shockLevel].length - 1;
+					manifold.island = this;
+					manifold.bodyA.island = this;
+					manifold.bodyB.island = this;
+				};
+			};
 
-				var TEST_UNOPTIMIZED_ISLANDS = false;
+			var TEST_UNOPTIMIZED_ISLANDS = true;
+			if (this.world.useIslands || TEST_UNOPTIMIZED_ISLANDS) {
+
 				if (TEST_UNOPTIMIZED_ISLANDS) {
 					islands = {};
+
+
+					// - Islands: list all unchecked manifolds, then starting from static objects loop through all neighbours and set shock propagation level if not set yet OR if new shock < this shock. Each traversal results in a new island. Any leftover objects belong to a separate island (no shock level)
 					
-					var manifoldsToAdd = [];
+					var manifoldsToAdd = [],
+						staticManifolds = [],
+						uncheckedManifolds = {},
+						staticManifoldIDs = {};
 					for (var manifoldID in contactManifolds) {
 						var manifold = contactManifolds[manifoldID];
-						manifoldsToAdd.push( manifold );
+
+						if (manifold.bodyA.static || manifold.bodyB.static) {
+							staticManifolds.push( manifold );
+							staticManifoldIDs[manifoldID] = manifold;
+						} else {
+							manifoldsToAdd.push( manifold );
+							uncheckedManifolds[manifoldID] = manifold;
+						}
 
 						manifold.shockLevel = null;
 						manifold.island = null;
@@ -767,6 +795,157 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						manifold.bodyB.island = null;
 					}
 
+
+
+					var addNeighbour = function(island, manifold, shockLevel){
+
+						if (manifold.island) {
+							debugger; // this shouldn't occur!!
+							if (manifold.island != island) {
+								// Merge these two islands
+								island.mergeWith(manifold.island);
+								delete islands[manifold.island.uid];
+								return true;
+							}
+
+							if (manifold.shockLevel > shockLevel) {
+								manifold.shockLevel = shockLevel;
+								island.updateManifolds();
+								return true;
+							}
+						} else {
+							// Add manifold to this island
+							island.addManifold(manifold, shockLevel);
+							delete uncheckedManifolds[manifold.uid];
+							return true;
+						}
+
+						return false;
+					};
+
+					var adjustNeighbour = function(manifold, shockLevel){
+						
+						manifold.shockLevel = shockLevel;
+						manifold.island.manifolds[shockLevel].splice(manifold.indexInIsland, 1);
+						for (var i=manifold.indexInIsland; i<manifold.island.manifolds[shockLevel].length; ++i) {
+							--manifold.island.manifolds[shockLevel][i].indexInIsland;
+						}
+
+						var shockLevel = manifold.shockLevel + 1;
+						for (var manifoldID in manifold.bodyA.manifolds) {
+							var _manifold = manifold.bodyA.manifolds[manifoldID];
+							if (_manifold == manifold) continue;
+							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
+							if (!_manifold.island) debugger;
+							if (_manifold.shockLevel > shockLevel) {
+								adjustNeighbour(_manifold, shockLevel);
+							}
+						}
+
+						for (var manifoldID in manifold.bodyB.manifolds) {
+							var _manifold = manifold.bodyB.manifolds[manifoldID];
+							if (_manifold == manifold) continue;
+							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
+							if (!_manifold.island) debugger;
+							if (_manifold.shockLevel > shockLevel) {
+								adjustNeighbour(_manifold, shockLevel);
+							}
+						}
+					};
+
+					var addNeighbours = function(manifold){
+
+						var shockLevel = manifold.shockLevel + 1;
+						for (var manifoldID in manifold.bodyA.manifolds) {
+							var _manifold = manifold.bodyA.manifolds[manifoldID];
+							if (_manifold == manifold) continue;
+							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
+							if (_manifold.island && _manifold.shockLevel > shockLevel) {
+								adjustNeighbour(_manifold, shockLevel);
+							} else if (uncheckedManifolds.hasOwnProperty(manifoldID)) {
+								addNeighbour(manifold.island, _manifold, shockLevel);
+								addNeighbours(_manifold);
+							}
+						}
+
+						for (var manifoldID in manifold.bodyB.manifolds) {
+							var _manifold = manifold.bodyB.manifolds[manifoldID];
+							if (_manifold == manifold) continue;
+							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
+							if (_manifold.island && _manifold.shockLevel > shockLevel) {
+								adjustNeighbour(_manifold, shockLevel);
+							} else if (uncheckedManifolds.hasOwnProperty(manifoldID)) {
+								addNeighbour(manifold.island, _manifold, shockLevel);
+								addNeighbours(_manifold);
+							}
+						}
+					};
+
+					for (var i=0; i<staticManifolds.length; ++i) {
+						var manifold = staticManifolds[i];
+
+						if (!manifold.island) {
+							// Need to make an island for this manifold
+
+							var island = null;
+							if (!manifold.bodyA.island || !manifold.bodyB.island) {
+								if (!manifold.bodyA.island && !manifold.bodyB.island) {
+									// Neither bodies belong to an island yet
+								} else if (!manifold.bodyA.island) {
+									manifold.bodyA.island = manifold.bodyB.island;
+								} else {
+									manifold.bodyB.island = manifold.bodyA.island;
+								}
+								island = manifold.bodyA.island;
+							} else if (manifold.bodyA.island == manifold.bodyB.island) {
+								island = manifold.bodyA.island;
+							} else {
+								// Both bodies belong to different islands..need to merge the islands
+								// Likely that both bodies are static
+								// island = manifold.bodyA.island.mergeWith( manifold.bodyB.island );
+
+								// Merge islands.. NOTE: shouldn't need to recheck shock levels
+								//
+								// TODO: check shock levels just in case
+								island = manifold.bodyA.island;
+								for (var shockLevel in manifold.bodyB.island) {
+									var shock = manifold.bodyB.island.manifolds[shock];
+									if (!shock) continue;
+									for (var mI=0; mI < shock.length; ++mI) {
+										var _manifold = shock[mI];
+										island.addManifold(_manifold, shockLevel);
+									}
+								}
+								delete islands[manifold.bodyB.island.uid];
+
+							}
+
+							if (!island) {
+								var island = new Island2();
+								islands[island.uid] = island;
+								manifold.island = island;
+								manifold.bodyA.island = island;
+								manifold.bodyB.island = island;
+							}
+							
+							island.addManifold(manifold, 0);
+						}
+
+						addNeighbours(manifold);
+					}
+
+					if (!_.isEmpty(uncheckedManifolds)) {
+						var island = new Island2();
+						islands[island.uid] = island;
+
+						for (var manifoldID in uncheckedManifolds) {
+							island.addManifold(uncheckedManifolds[manifoldID]);
+						}
+					}
+
+
+
+					/*
 					while (manifoldsToAdd.length) {
 						var manifold = manifoldsToAdd[0];
 						manifoldsToAdd.splice(0, 1);
@@ -805,6 +984,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							}
 						}
 					}
+					*/
 				}
 
 			var TEST_ENABLE_SHOCK_REWEIGHT = false;
@@ -1136,7 +1316,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			for (var manifoldID in body.manifolds) {
 				var manifold = body.manifolds[manifoldID];
-				if (manifold.island) manifold.island.removeManifold(manifold);
+				if (physique.world.useIslands && manifold.island) manifold.island.removeManifold(manifold);
 
 				for (var i=0; i<manifold.contacts.length; ++i) {
 				// for (var contactID in manifold.contacts) {
@@ -1292,6 +1472,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					body.userMoved = false;
 					body.asleep = false;
 					body.wantToSleep = 0;
+					body.invMass = body.storedInvMass;
+					body.invInertiaTensor = body.storedInvInertiaTensor;
 					Broadphase.updateAABB(body);
 					Broadphase.updateBodyInBroadphase(body);
 				}
