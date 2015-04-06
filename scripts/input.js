@@ -6,6 +6,7 @@ define(function(){
 		MOVE_RIGHT    = 1<<4,
 		MOVE_UP       = 1<<5,
 		MOVE_DOWN     = 1<<6,
+		MOVE_TURN     = 1<<8,
 		MOVE_RUNNING  = 1<<7;
 	var UI = {
 		viewport: {
@@ -214,6 +215,8 @@ define(function(){
 				UI.viewport.isMoving |= MOVE_UP;
 			} else if (evt.keyCode === 69) {
 				UI.viewport.isMoving |= MOVE_DOWN;
+			} else if (evt.keyCode === 17 || evt.ctrlKey) {
+				UI.viewport.isMoving |= MOVE_TURN;
 			}
 		});
 
@@ -233,6 +236,8 @@ define(function(){
 				UI.viewport.isMoving &= ~MOVE_UP;
 			} else if (evt.keyCode === 69) {
 				UI.viewport.isMoving &= ~MOVE_DOWN;
+			} else if (evt.keyCode === 17 || evt.ctrlKey) {
+				UI.viewport.isMoving &= ~MOVE_TURN;
 			}
 		});
 

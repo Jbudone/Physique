@@ -156,6 +156,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		moveScale = 0.2,
 		MOVE_UP = 1<<5,
 		MOVE_DOWN = 1<<6,
+		MOVE_TURN = 1<<8,
 		MOVE_LEFT = 1<<3,
 		MOVE_RIGHT = 1<<4,
 		MOVE_FORWARD = 1<<1,
@@ -201,10 +202,11 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 
 		addScene('rolling-ball', "Ball Roll");
 		addScene('box-stacking', "Box Stacking");
+		addScene('funnel', "Funnel");
 
 
 		// Load default scene
-		loadScene('box-stacking');
+		loadScene('funnel');
 
 
 	}, function(error){
@@ -264,6 +266,8 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			isMoving |= MOVE_DOWN;
 		} else if (evt.keyCode === 32) {
 			shootCube();
+		} else if (evt.keyCode === 17 || evt.ctrlKey) {
+			isMoving |= MOVE_TURN;
 		}
 	});
 
@@ -281,6 +285,8 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			isMoving &= ~MOVE_UP;
 		} else if (evt.keyCode === 79) {
 			isMoving &= ~MOVE_DOWN;
+		} else if (evt.keyCode === 17 || evt.ctrlKey) {
+			isMoving &= ~MOVE_TURN;
 		}
 	});
 
@@ -384,6 +390,8 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		while (deltaTime > 0) {
 			var delta = Math.min(Settings.stepTime, deltaTime);
 
+			delta = Math.max(Settings.stepTime, delta); // FIXME: a test to see if getting less than stepTime is error prone
+
 			physique.step(delta);
 			deltaTime -= delta;
 		}
@@ -433,7 +441,13 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 				var vec = new THREE.Vector3(dX, dY, 0.0);
 				// var vec = new THREE.Vector3(raycaster.hasMoved.dX, -raycaster.hasMoved.dY, 0.0);
 				vec.applyQuaternion(renderer.camera.quaternion);
-				raycaster.holdingOnto.position.add( vec.multiplyScalar( 0.006 * (window.innerWidth/window.innerHeight) ) );
+
+				if (isMoving & MOVE_TURN) {
+					
+				} else {
+					raycaster.holdingOnto.position.add( vec.multiplyScalar( 0.006 * (window.innerWidth/window.innerHeight) ) );
+				}
+
 				raycaster.hasMoved = null;
 				raycaster.holdingOnto.userMoved = true;
 			}

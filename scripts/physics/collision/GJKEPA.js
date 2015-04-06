@@ -10,16 +10,22 @@ define(['physics/memstore'], function(MemStore){
 		var maximumIterationsOfGJK = 0;
 		this.checkGJK = function(bodyA, bodyB){
 
+			Profiler.profile('GJK');
 			var d = MemStore.Vector3(1, 0, 0),
 				p = this.supportGJK(bodyA, bodyB, d),
 				simplex = [p];
 
 			d = (MemStore.Vector3()).sub(p);
 			var iFroze = 50;
+			var badSupports = 0;
 			while (true) {
 				p = this.supportGJK(bodyA, bodyB, d);
 
 				if (p.dot(d) < 0) {
+					Profiler.profileEnd('GJK');
+					if (badSupports) {
+						console.error("GJK ended w/ bad supports: " + badSupports);
+					}
 					return false;
 				}
 
@@ -34,6 +40,8 @@ define(['physics/memstore'], function(MemStore){
 
 					// EPA (Expanding Polytope Algorithm)
 					//
+					Profiler.profileEnd('GJK');
+					Profiler.profile('EPA');
 
 					var polytope = {
 							faces: [],
@@ -92,6 +100,10 @@ define(['physics/memstore'], function(MemStore){
 						var p = this.supportGJK(bodyA, bodyB, nearestFace.face.normal);
 
 						if ((p.dot(nearestFace.face.normal) - nearestFace.distance) < 0.0001) {
+
+							if (badSupports) {
+								console.error("Bad supports WITH successful GJK: " + badSupports);
+							}
 
 							// Barycentric coordinates
 							var a = polytope.vertices[nearestFace.face.a],
@@ -216,6 +228,7 @@ define(['physics/memstore'], function(MemStore){
 							// var localA = contactA.clone().sub( bodyA.position ).applyQuaternion( bodyA.quaternion.clone().inverse() ),
 							// 	localB = contactB.clone().sub( bodyB.position ).applyQuaternion( bodyB.quaternion.clone().inverse() );
 
+							Profiler.profileEnd('EPA');
 							return {
 								originA: contactA,
 								originB: contactB,
@@ -236,7 +249,13 @@ define(['physics/memstore'], function(MemStore){
 						// FIXME FIXME FIXME FIXME FIXME FIXME!
 						var _pHash = parseInt(p.x * 1000*1000*1000 + p.y * 1000*1000 + p.z * 1000);
 						if (_pHashTable.hasOwnProperty(_pHash)) {
-							return false;
+							// FIXME: NOTE: this is clearly able to run sometimes even with the duplicate
+							// support points... look into why this happens and is still able to get a
+							// successful GJK/EPA
+							// debugger;
+							++badSupports;
+							// Profiler.profileEnd('EPA');
+							// return false;
 						}
 						_pHashTable[_pHash] = p;
 						// FIXME FIXME FIXME FIXME FIXME FIXME!
@@ -370,10 +389,18 @@ define(['physics/memstore'], function(MemStore){
 						}
 					};
 
+					Profiler.profileEnd('GJK');
 					return true;
 				}
 
-				if (--iFroze <= 0) return false;
+				if (--iFroze <= 0) {
+					Profiler.profileEnd('GJK');
+
+					if (badSupports) {
+						console.error("Bad supports with frozen GJK: "+badSupports);
+					}
+					return false;
+				}
 			}
 		};
 

@@ -59,9 +59,8 @@
 			- BUG: if 2 objects are asleep in an island, and another object is added it doesn't collide with the top object
 
 		* UI 
-			- edit clock
-			- keep track of snapshots of world; then step backwards in time (debug)
 			- improve raycasting / moving object
+			- display realtime profiler
 		* Examples
 			- Dominos
 			- Wall of cubes, and shooting out a massive sphere at it (like in the proposal pic)
@@ -75,8 +74,6 @@
 	* Mouse constraint
 	* Sleep mode; realistic timing + delta + settings
 	* Speed improvements
-	* Profiling: profiler to start and stop w/ a given label, then adds the total time on ending to the mean/min/max for that label
-	* FIXME: effective mass of friction for each contact (different than effective mass of penetration)
 	* Reset scene
 	
 
@@ -94,8 +91,18 @@
 		- Check GDC2006!
 		- Check margin/distance depth (negative depth?) - if max depth is 0.09 instead of 0.009 then causes artifacts, perhaps need to modify baumgarte term for negative depth?
 		- Check feature points correct?
-		- Islands: list all unchecked manifolds, then starting from static objects loop through all neighbours and set shock propagation level if not set yet OR if new shock < this shock. Each traversal results in a new island. Any leftover objects belong to a separate island (no shock level)
+		- Islands: improve efficiency
+		- Shock propagation: propagate weight? (saved article)
 
+
+	TOP PRIORITY
+		- Spatial data structure
+		- misc. constraints
+		- Code cleanup!!
+		- sleep->wake invMass==0 bug (after moving with mouse..should wake up as soon as we move the object)
+		- Abstract shapes
+		- More demos
+		- Allow rotating objects, scaling.. report scene
 
 
 		Note: fixes so far..
@@ -142,9 +149,10 @@
 			"baseUrl": "scripts",
 		});
 
-		require(['keys'], function(Keys){
+		require(['keys', 'profiler'], function(Keys, Profiler){
 
 			window['Keys'] = Keys;
+			window['Profiler'] = Profiler;
 
 			var readyToStartup = function(){
 

@@ -42,27 +42,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			runOnce: null
 		};
 
-		var TEST_ScaleT1 = 1,
-			TEST_ScaleT2 = -1,
-			TEST_T1Factor = 1,
-			TEST_T2Factor = 1,
-			TEST_DenomFactor1 = 1,
-			TEST_DenomFactor2 = 1,
-			TEST_NormTangent = true,
-			resetDeltas = true;
 
-		var mass = 1.0,//0.60,
-			inertia = (1/3) * mass;
-
-		/*****************************************************************
-		 *****************************************************************
-		 						Broadphase Collision                         
-		 */
-
-		/*****************************************************************
-		 *****************************************************************
-		 						Narrowphase Collision                         
-		 */
+		var mass = 1.0;
 
 
 		/*****************************************************************
@@ -741,11 +722,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			for (var uid in physique.bodies) {
 				var body = physique.bodies[uid];
-
-				if (resetDeltas) {
-					body.deltaV.multiplyScalar(0);
-					body.deltaW.multiplyScalar(0);
-				}
 			}
 
 
@@ -769,6 +745,9 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			if (this.world.useIslands || TEST_UNOPTIMIZED_ISLANDS) {
 
 				if (TEST_UNOPTIMIZED_ISLANDS) {
+
+					Profiler.profile("islandCreation");
+
 					islands = {};
 
 
@@ -836,8 +815,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							var _manifold = manifold.bodyA.manifolds[manifoldID];
 							if (_manifold == manifold) continue;
 							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
-							if (!_manifold.island) debugger;
-							if (_manifold.shockLevel > shockLevel) {
+							if (!_manifold.island) {
+								// TODO: look into why this might be occuring (although rare, should it ever
+								// occur?)
+								addNeighbour(manifold.island, _manifold, shockLevel);
+							} else if (_manifold.shockLevel > shockLevel) {
 								adjustNeighbour(_manifold, shockLevel);
 							}
 						}
@@ -846,8 +828,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							var _manifold = manifold.bodyB.manifolds[manifoldID];
 							if (_manifold == manifold) continue;
 							if (staticManifoldIDs.hasOwnProperty(manifoldID)) continue;
-							if (!_manifold.island) debugger;
-							if (_manifold.shockLevel > shockLevel) {
+							if (!_manifold.island) {
+								// TODO: look into why this might be occuring (although rare, should it ever
+								// occur?)
+								addNeighbour(manifold.island, _manifold, shockLevel);
+							} else if (_manifold.shockLevel > shockLevel) {
 								adjustNeighbour(_manifold, shockLevel);
 							}
 						}
@@ -985,6 +970,9 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						}
 					}
 					*/
+
+
+					Profiler.profileEnd("islandCreation");
 				}
 
 			var TEST_ENABLE_SHOCK_REWEIGHT = false;
@@ -1440,7 +1428,13 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			};
 		*/
 
-			Broadphase.addBodyIntoBroadphase(mesh.body);
+
+			mesh.body.updateInBroadphase = function(){
+				Broadphase.updateAABB(this);
+				Broadphase.addBodyIntoBroadphase(this);
+			};
+
+			mesh.body.updateInBroadphase();
 		};
 
 		this.onDebugHelperArrow = new Function();
@@ -1470,10 +1464,14 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					Broadphase.updateBodyInBroadphase(body);
 				} else if (body.userMoved) {
 					body.userMoved = false;
-					body.asleep = false;
-					body.wantToSleep = 0;
-					body.invMass = body.storedInvMass;
-					body.invInertiaTensor = body.storedInvInertiaTensor;
+
+					if (body.asleep) {
+						body.asleep = false;
+						body.wantToSleep = 0;
+						debugger;
+						body.invMass = body.storedInvMass;
+						body.invInertiaTensor = body.storedInvInertiaTensor;
+					}
 					Broadphase.updateAABB(body);
 					Broadphase.updateBodyInBroadphase(body);
 				}

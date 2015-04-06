@@ -21,6 +21,11 @@ define(function(){
 			return mesh;
 		};
 
+		this.removeMesh = function(mesh){
+			this.onRemovedMesh(this.meshes[mesh.uid]);
+			delete this.meshes[mesh.uid];
+		};
+
 		this.reset = function(){
 
 			for (var meshID in this.meshes) {
