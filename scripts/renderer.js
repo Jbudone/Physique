@@ -16,8 +16,8 @@ define(function(){
 		var texturePack = {
 
 			textureList: {
-				stone: { file: 'stone.jpg' },
-				grass: { file: 'grass.jpg', options: { repeat: true } }
+				stone: { file: 'stone.jpg', loading:[] },
+				grass: { file: 'grass.jpg', options: { repeat: true }, loading:[] }
 			},
 
 			textureMap: {
@@ -64,6 +64,7 @@ define(function(){
 					var loadNext = function(){
 
 						if (texturesToLoad.length == 0) {
+							succeeded(renderer);
 							return;
 						}
 
@@ -79,6 +80,14 @@ define(function(){
 										texture.repeat.set( 256, 256 );
 										texture.update();
 									}
+
+									var loading = texturePack.textureList[textureToLoad.id].loading;
+									for (var i=0; i<loading.length; ++i) {
+										var mesh = loading[i],
+											material = new THREE.MeshBasicMaterial( { map: texture } );
+										mesh.material = material;
+									}
+									delete texturePack.textureList[textureToLoad.id].loading;
 
 									if (texturesToLoad.length === 0) {
 										succeeded(renderer);
@@ -118,6 +127,7 @@ define(function(){
 					urlPrefix + "Up2048.png", urlPrefix + "Down2048.png",
 					urlPrefix + "Front2048.png", urlPrefix + "Back2048.png" ];
 				
+
 				var textureCube = THREE.ImageUtils.loadTextureCube( urls, null,
 						function(texture){
 
@@ -179,6 +189,17 @@ define(function(){
 			scene.remove(mesh.body);
 		};
 
+		this.applyTexture = function(mesh, texture){
+			
+			if (texturePack.textureList[texture].hasOwnProperty('texture')) {
+				// Texture ready
+				var material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texture].texture } );
+				mesh.material = material;
+			} else {
+				texturePack.textureList[texture].loading.push(mesh);
+			}
+		};
+
 		this.addMesh = function(_meshProps){
 			if (!_.isObject(_meshProps)) _meshProps = {};
 
@@ -202,9 +223,9 @@ define(function(){
 				}
 
 				geometry = new THREE.BoxGeometry( x, y, z, 1, 1, 1 );
-				// material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
-				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_BOX]].texture } );
-				mesh = new THREE.Mesh( geometry, material );
+				material = new THREE.MeshBasicMaterial( { color: 0x00ff00, transparent: true, opacity: 0.5 } );
+				mesh = new THREE.Mesh( geometry );
+				this.applyTexture(mesh, texturePack.textureMap[MESH_BOX]);
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
 
@@ -215,9 +236,10 @@ define(function(){
 				});
 
 				geometry = new THREE.SphereGeometry( meshProps.dimensions.radius, 12, 9 );
-				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_SPHERE]].texture } );
+				material = new THREE.MeshBasicMaterial( { color: 0x000000 } );
 				mesh = new THREE.Mesh( geometry, material );
 				mesh.radius = meshProps.dimensions.radius;
+				this.applyTexture(mesh, texturePack.textureMap[MESH_SPHERE]);
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
 
@@ -232,8 +254,9 @@ define(function(){
 
 
 				geometry = new THREE.BoxGeometry( x, y, z, 1, 1, 1 );
-				material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texturePack.textureMap[MESH_PLANE]].texture } );
+				material = new THREE.MeshBasicMaterial( { color: 0x000000 } );
 				mesh = new THREE.Mesh( geometry, material );
+				this.applyTexture(mesh, texturePack.textureMap[MESH_PLANE]);
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
 			} else {
