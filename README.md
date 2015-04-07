@@ -1,6 +1,7 @@
 
 A realtime physics engine. This is a rigid body simulator. Collision detection is using GJK for testing and EPA for reporting contact points, while collision resolution uses PGS Sequential Impulses. Bodies are split into islands before the resolution phase, and guendelman shock propagation is applied to improve stable stacking. 
 
+![StableStack](screenshots/stable-stack.gif)
 
 Collision Detection
 -------------
@@ -30,18 +31,11 @@ Collision Resolution
 	TODO: Explanation/Descriptions
 
 
-Features
----------
 
-##Stable Stacking
-
-![StableStack](screenshots/stable-stack.gif)
 
 Fun
 -------
 
-![Baumgarte](screenshots/baumgarte.gif)
-
-![Funnel](screenshots/funnel.gif)
-
-![Ball](screenshots/ballrolling.gif)
+| | | |
+|---|---|---|
+| ![Baumgarte](screenshots/baumgarte.gif) | ![Funnel](screenshots/funnel.gif) | ![Ball](screenshots/ballrolling.gif) |
