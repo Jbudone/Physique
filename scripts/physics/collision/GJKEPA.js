@@ -17,15 +17,11 @@ define(['physics/memstore'], function(MemStore){
 
 			d = (MemStore.Vector3()).sub(p);
 			var iFroze = 50;
-			var badSupports = 0;
 			while (true) {
 				p = this.supportGJK(bodyA, bodyB, d);
 
 				if (p.dot(d) < 0) {
 					Profiler.profileEnd('GJK');
-					if (badSupports) {
-						console.error("GJK ended w/ bad supports: " + badSupports);
-					}
 					return false;
 				}
 
@@ -87,23 +83,12 @@ define(['physics/memstore'], function(MemStore){
 					if (!faceNormalIsGood(polytope.faces[1])) ++darn; //debugger;
 					if (!faceNormalIsGood(polytope.faces[2])) ++darn; //debugger;
 					if (!faceNormalIsGood(polytope.faces[3])) ++darn; //debugger;
-					var _pHashTable = {};
-					for (var i=0; i<polytope.vertices.length; ++i) {
-						var p = polytope.vertices[i],
-							_pHash = parseInt(p.x * 1000*1000*1000 + p.y * 1000*1000 + p.z * 1000);
-						_pHashTable[_pHash] = p;
-					}
-						// FIXME FIXME FIXME FIXME FIXME FIXME!
 					while(true) {
 						var nearestFace = this.getNearestFaceGJK(polytope);
 
 						var p = this.supportGJK(bodyA, bodyB, nearestFace.face.normal);
 
 						if ((p.dot(nearestFace.face.normal) - nearestFace.distance) < 0.0001) {
-
-							if (badSupports) {
-								console.error("Bad supports WITH successful GJK: " + badSupports);
-							}
 
 							// Barycentric coordinates
 							var a = polytope.vertices[nearestFace.face.a],
@@ -124,7 +109,6 @@ define(['physics/memstore'], function(MemStore){
 
 
 							// FIXME FIXME FIXME FIXME FIXME FIXME!
-							// TODO: referenced this from http://hacktank.net/blog/?p=119 ... figure it out!!
 							var v0 = AB,
 								v1 = AC,
 								v2 = _p.clone().sub(a),
@@ -202,10 +186,11 @@ define(['physics/memstore'], function(MemStore){
 								nearestFace.face.normal.y == 0 &&
 								nearestFace.face.normal.z == 0) {
 									debugger;
-								} else if (nearestFace.distance == 0) {
-									debugger;
 								}
 							// FIXME FIXME FIXME FIXME FIXME FIXME!
+
+							// NOTE: nearestFAce.distance == 0 indicates that its colliding on the surface
+							// (both support points are the same)
 
 							var contact = contactA.clone().add(contactB).multiplyScalar(0.5);
 							contact.iA = contactA.i;
@@ -245,20 +230,6 @@ define(['physics/memstore'], function(MemStore){
 							};
 
 						} else {
-
-						// FIXME FIXME FIXME FIXME FIXME FIXME!
-						var _pHash = parseInt(p.x * 1000*1000*1000 + p.y * 1000*1000 + p.z * 1000);
-						if (_pHashTable.hasOwnProperty(_pHash)) {
-							// FIXME: NOTE: this is clearly able to run sometimes even with the duplicate
-							// support points... look into why this happens and is still able to get a
-							// successful GJK/EPA
-							// debugger;
-							++badSupports;
-							// Profiler.profileEnd('EPA');
-							// return false;
-						}
-						_pHashTable[_pHash] = p;
-						// FIXME FIXME FIXME FIXME FIXME FIXME!
 
 							// Remove this triangle and all triangles facing same direction
 							//
@@ -346,7 +317,6 @@ define(['physics/memstore'], function(MemStore){
 									AV = _v.clone().sub(a),
 									BV = _v.clone().sub(b),
 									ABV = AB.clone().cross(AV);
-								if (ABV == 0) debugger; // FIXME FIXME FIXME FIXME FIXME FIXME!
 								polytope.faces.push(new THREE.Face3(edge.a, edge.b, _i, ABV));
 								polytope.faces[polytope.faces.length-1].normal.normalize();
 
@@ -360,10 +330,14 @@ define(['physics/memstore'], function(MemStore){
 
 								var _new_face_test = polytope.faces[polytope.faces.length-1];
 								// FIXME FIXME FIXME FIXME FIXME FIXME!
+								// TODO: figure out why this is occuring (probably numerical issue with EPA?)
 								if (_new_face_test.normal.x == 0 &&
 									_new_face_test.normal.y == 0 &&
 									_new_face_test.normal.z == 0) {
-										debugger;
+										// debugger;
+										console.error("Failed to build EPA");
+										Profiler.profileEnd('EPA');
+										return false;
 									}
 								// FIXME FIXME FIXME FIXME FIXME FIXME!
 
@@ -391,14 +365,18 @@ define(['physics/memstore'], function(MemStore){
 
 					Profiler.profileEnd('GJK');
 					return true;
+				} else if (d === false) {
+
+					// FIXME: we've hit an early-out in GJK. This isn't handled yet, it means we need to build
+					// the simplex manually before sending it to EPA. THis isn't handled yet, so simply return
+					// false for now.
+					console.error("Failed to build GJK");
+					Profiler.profileEnd('GJK');
+					return false;
 				}
 
 				if (--iFroze <= 0) {
 					Profiler.profileEnd('GJK');
-
-					if (badSupports) {
-						console.error("Bad supports with frozen GJK: "+badSupports);
-					}
 					return false;
 				}
 			}
@@ -455,6 +433,7 @@ define(['physics/memstore'], function(MemStore){
 					d = AO;
 				}
 
+				if (d.x == 0 && d.y == 0 && d.z == 0) return false; // FIXME: early out, origin most likely lays on edge. This means GJK DOES pass, but need to solve the simplex
 				return d;
 
 			} else if (simplex.length === 3) {
@@ -560,6 +539,7 @@ define(['physics/memstore'], function(MemStore){
 				AO.free();
 				ABC.free();
 				regionIndicator.free();
+				if (d.x == 0 && d.y == 0 && d.z == 0) return false; // FIXME: origin probably lays on edge.. should this ever occur ?? What can we do to solve the early out?
 				return d;
 
 			} else if (simplex.length === 4) {
@@ -634,6 +614,7 @@ define(['physics/memstore'], function(MemStore){
 
 				AB.free(); AC.free(); AO.free();
 				regionIndicator.free();
+				if (D.x == 0 && D.y == 0 && D.z == 0) return false; // FIXME: the origin is likely on one of the edges!! Should this ever occur ??
 				return D;
 			}
 		};

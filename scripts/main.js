@@ -174,13 +174,20 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 
 				runWorld = true;
 				exampleScene.initialize(scene);
+
+				scene.stop = exampleScene.stop.bind(exampleScene);
+				scene.pause = exampleScene.pause.bind(exampleScene);
+				scene.resume = exampleScene.resume.bind(exampleScene);
 			};
 
 			var resetScene = function(){
 
+				scene.stop();
 				scene.reset();
+				physique.reset();
 			};
 
+			scene.stop();
 			resetScene();
 			startScene();
 
@@ -206,7 +213,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 
 
 		// Load default scene
-		loadScene('funnel');
+		loadScene('box-stacking');
 
 
 	}, function(error){
@@ -298,12 +305,14 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 	$('#startPhysics').click(function(){
 		physique.world.scaleTime = $('#scaleTime').val();
 		physique.world.runOnce = null;
+		scene.resume();
 		return false;
 	});
 
 	$('#stopPhysics').click(function(){
 		physique.world.scaleTime = 0.0;
 		physique.world.runOnce = null;
+		scene.pause();
 		return false;
 	});
 
@@ -390,8 +399,6 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		while (deltaTime > 0) {
 			var delta = Math.min(Settings.stepTime, deltaTime);
 
-			delta = Math.max(Settings.stepTime, delta); // FIXME: a test to see if getting less than stepTime is error prone
-
 			physique.step(delta);
 			deltaTime -= delta;
 		}
@@ -410,6 +417,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 						if (intersect.object.static === false) {
 							if (activeMesh) {
 								activeMesh.static = false;
+								debugger;
 								activeMesh.invMass = activeMesh.storedInvMass;
 								activeMesh.invInertiaTensor = activeMesh.storedInvInertiaTensor;
 								if (activeMesh.invMass == 0) debugger;
@@ -420,10 +428,12 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 							raycaster.holdingOnto = activeMesh;
 							activeMesh.velocity.multiplyScalar(0.0);
 							activeMesh.angularVelocity.multiplyScalar(0.0);
-							activeMesh.storedInvMass = activeMesh.invMass;
-							activeMesh.storedInvInertiaTensor = activeMesh.invInertiaTensor;
-							activeMesh.invMass = 0.0;
-							activeMesh.invInertiaTensor = 0.0;
+							if (!activeMesh.asleep) {
+								activeMesh.storedInvMass = activeMesh.invMass;
+								activeMesh.storedInvInertiaTensor = activeMesh.invInertiaTensor;
+								activeMesh.invMass = 0.0;
+								activeMesh.invInertiaTensor = 0.0;
+							}
 							raycaster.holdingOnto.static = true;
 							break;
 						}

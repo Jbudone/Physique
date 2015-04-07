@@ -2,7 +2,7 @@ define(function(){
 
 	var Settings = {
 		offsetYOfObjects: 1.0,//1.5,
-		numObjects: 5
+		numObjects: 12
 	};
 
 	var Scene = function(){
@@ -26,6 +26,10 @@ define(function(){
 			});
 
 		};
+
+		this.stop = function(){};
+		this.pause = function(){};
+		this.resume = function(){};
 	};
 
 	return (new Scene());

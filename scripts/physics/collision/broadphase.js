@@ -154,6 +154,7 @@ define(function(){
 		this.removeBodyInBroadphase = function(body){
 
 			// Find my position
+			// FIXME: for some reason this sometimes doesn't remove the body..
 			var xIndex = 0,
 				zIndex = 0;
 			for (var i=0; i<this.axisLineX.length; ++i) {
@@ -171,6 +172,11 @@ define(function(){
 			this.axisLineX.splice(xIndex, 1);
 			this.axisLineZ.splice(zIndex, 1);
 
+		};
+
+		this.reset = function(){
+			this.axisLineX = [];
+			this.axisLineZ = [];
 		};
 
 	};

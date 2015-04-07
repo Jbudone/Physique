@@ -22,7 +22,9 @@ define(function(){
 		};
 
 		this.removeMesh = function(mesh){
-			this.onRemovedMesh(this.meshes[mesh.uid]);
+			var _mesh = this.meshes[mesh.uid];
+			if (!_mesh) return;
+			this.onRemovedMesh(_mesh);
 			delete this.meshes[mesh.uid];
 		};
 
@@ -35,6 +37,11 @@ define(function(){
 
 			this.meshCount = 0;
 		};
+
+		this.stop = function(){ };
+		this.pause = function(){ };
+		this.resume = function(){ };
+
 	};
 
 	return Scene;

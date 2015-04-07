@@ -52,6 +52,11 @@ define(function(){
 			});
 
 		};
+
+
+		this.stop = function(){};
+		this.pause = function(){};
+		this.resume = function(){};
 	};
 
 	return (new Scene());

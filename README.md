@@ -1,41 +1,47 @@
 
+A realtime physics engine. This is a rigid body simulator. Collision detection is using GJK for testing and EPA for reporting contact points, while collision resolution uses PGS Sequential Impulses. Bodies are split into islands before the resolution phase, and guendelman shock propagation is applied to improve stable stacking. 
+
+
 Collision Detection
-	Local vs. Global
-	Jacobian, PGS
-	LCP
-	Narrowphase not necessary (used for mesh objects w/ multiple primitives)
-	> Storage
-		- R-Trees?  K-d Trees?
-	> Broadphase
-		- Bounding Boxes & Sweep and Prune?  --- is this necessary for non-AABB boxes?
-	> Narrowphase
-		- GJK or SAT?
-	> Contact Points & Normals
-	> Vertex/Face, Edge-Edge?
+-------------
+
+##Broadphase
+
+I'm using the sweep and prune method quickly and efficiently determine determine potential contacts between AABB's of bodies. Sweep and Prune makes great use of temporal coherence since bodies don't move much between frames, they can be stored in arrays for each axis and compared with bodies in the same region of the array.
+
+##Narrowphase
+
+Contacts from the broadphase are passed into the narrowphase for accurate testing of contact. I've adopted the commonly used GJK and EPA algorithms because of their efficiency and versatility in accurate collision detection.
+
+##GJK
+
+GJK is an efficient and versatile intersection testing algorithm. This algorithm is widely adopted in many games because of its efficiency and scalability to handle many shapes. GJK only works with convex polyhedrons, so more complicated bodies must be split into multiple shapes. GJK also will only tell you if the bodies are colliding, but not where.
+
+##EPA
+
+If a collision is detected from GJK, the terminated simplex from GJK is passed to EPA to be blown up inside of the minkowski configuration between both bodies. From this we can find two points of intersection (one for each body), a normal axis, and a contact depth. Sadly EPA only reports the deepest point of contact, so I've implemented contact caching between bodies in order to maintain the contact manifold between two bodies.
 
 Collision Resolution
-	Avoiding large mass ratios
-	Only resolves contacts found from collision detection
-	CCD vs. DCD  -- CCD uses continuous collision query (raycast in direction that the object moved)
-	> LCP PGS (Sequential Impulse)
-	> Restitution
-	> Warm starting
-		- Iterative solver requires initial guess for lambda; store lambda from previous time step and use that as initial guess for next time step
-	> Slop
-		- Allow some penetration to avoid overshooting impulse
-	> Caching?
-		- Contact caching: cache contacts at end of timestep; on next timestep find all new contacts, and if a cached contact is found then use the lambda calculated from that cache
-	> Sleeping/Freezing
-	> Accumulated impulses + Clamping
-		- For each constraint keep track of the total impulse applied (accumulation); clamp this total impulse to not be negative
-		- Hence, corrective impulses can be negative but total impulse will be positive (avoids jiterring)
+-------------
 
 
+##Sequential Impulses
 
-Questions:
-	> What is the process? (predict collisions and THEN resolve each individual contact?  for i=0..maxIters { for c=0...nCollisions { resole(); } } ??)
-	> How does iterative solver find corrective impulse, and how does it add impulses to total impulse? (also, what is a positive/negative impulse in this case, for clamping)
-	> What is lambda in the iterative solver (used in warm starting)
-	> How to find contact points & normals
-	> Is sleeping/freezing useful?
-	> Collision detection: finds predicted collisions?
+	TODO: Explanation/Descriptions
+
+
+Features
+---------
+
+##Stable Stacking
+
+![StableStack](screenshots/stable-stack.gif)
+
+Fun
+-------
+
+![Baumgarte](screenshots/baumgarte.gif)
+
+![Funnel](screenshots/funnel.gif)
+
+![Ball](screenshots/ballrolling.gif)

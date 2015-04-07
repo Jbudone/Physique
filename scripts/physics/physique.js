@@ -313,11 +313,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				if (contact.depth < 0.0) return;
 				// contact.depth -= physique.world.slop;
 
-				var hash = null;
-				if (physique.world.contactsByFeatures) {
-					hash = this.hashContactVerts(contact);
-					contact.vHash = hash;
-				}
+				var hash = this.hashContactVerts(contact);
+				contact.vHash = hash;
 
 				var closestDist = Math.pow(physique.world.closestContactDistanceThreshold, 2),
 					closestI = null;
@@ -326,8 +323,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 					if (this.contactsByFeatures.hasOwnProperty(hash)) {
 						this.contactsByFeatures[hash].update(contact);
-						physique.onUpdateContact(contact.hash + hash, contact.originA);
-						physique.onUpdateContact(contact.hash + hash + 'B', contact.originB);
+						physique.onUpdateContact(contact.hash + contact.vHash, contact.originA);
+						physique.onUpdateContact(contact.hash + contact.vHash + 'B', contact.originB);
 					} else {
 						this.addContact(hash, contact);
 					}
@@ -389,8 +386,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 					// physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash);
 					// physique.onRemoveContact(this.contacts[contactID].hash + this.contacts[contactID].vHash + 'B');
-					physique.onRemoveContact(this.contacts[weakestContactI].hash + weakestContactI);
-					physique.onRemoveContact(this.contacts[weakestContactI].hash + weakestContactI + 'B');
+					physique.onRemoveContact(this.contacts[weakestContactI].hash + this.contacts[weakestContactI].vHash);
+					physique.onRemoveContact(this.contacts[weakestContactI].hash + this.contacts[weakestContactI].vHash + 'B');
 
 					if (physique.world.contactsByFeatures) {
 						delete this.contactsByFeatures[this.contacts[weakestContactI].vHash];
@@ -404,8 +401,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				++this.length;
 				// physique.onNewContact(contact.hash + hash, contact.originA);
 				// physique.onNewContact(contact.hash + hash + 'B', contact.originB);
-				physique.onNewContact(contact.hash + i, contact.originA);
-				physique.onNewContact(contact.hash + i + 'B', contact.originB);
+				physique.onNewContact(contact.hash + hash, contact.originA);
+				physique.onNewContact(contact.hash + hash + 'B', contact.originB);
 				var _contact = new Contact(contact, this);
 				_contact.hash = contact.hash;
 				_contact.vHash = hash;
@@ -452,8 +449,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							++removedCount;
 							// physique.onRemoveContact(contact.hash + contact.vHash);
 							// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-							physique.onRemoveContact(contact.hash + i);
-							physique.onRemoveContact(contact.hash + i + 'B');
+							physique.onRemoveContact(contact.hash + contact.vHash);
+							physique.onRemoveContact(contact.hash + contact.vHash + 'B');
 							contact.remove();
 
 							if (physique.world.contactsByFeatures) {
@@ -471,8 +468,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							++removedCount;
 							// physique.onRemoveContact(contact.hash + contact.vHash);
 							// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-							physique.onRemoveContact(contact.hash + i);
-							physique.onRemoveContact(contact.hash + i + 'B');
+							physique.onRemoveContact(contact.hash + contact.vHash);
+							physique.onRemoveContact(contact.hash + contact.vHash + 'B');
 							contact.remove();
 
 							if (physique.world.contactsByFeatures) {
@@ -506,8 +503,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					contact.depth = newDistance;
 					// physique.onUpdateContact(contact.hash + contact.vHash, contact.vertexA);
 					// physique.onUpdateContact(contact.hash + contact.vHash + 'B', contact.vertexB);
-					physique.onUpdateContact(contact.hash + i, contact.vertexA);
-					physique.onUpdateContact(contact.hash + i + 'B', contact.vertexB);
+					physique.onUpdateContact(contact.hash + contact.vHash, contact.vertexA);
+					physique.onUpdateContact(contact.hash + contact.vHash + 'B', contact.vertexB);
 
 					contact.update();
 				}
@@ -609,8 +606,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					var contact = manifold.contacts[i];
 					// physique.onRemoveContact(contact.hash + contact.vHash);
 					// physique.onRemoveContact(contact.hash + contact.vHash + 'B');
-					physique.onRemoveContact(contact.hash + i);
-					physique.onRemoveContact(contact.hash + i + 'B');
+					physique.onRemoveContact(contact.hash + contact.vHash);
+					physique.onRemoveContact(contact.hash + contact.vHash + 'B');
 					contact.remove();
 				}
 				delete contactManifolds[hash];
@@ -1309,8 +1306,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				for (var i=0; i<manifold.contacts.length; ++i) {
 				// for (var contactID in manifold.contacts) {
 					var contact = manifold.contacts[i];
-					physique.onRemoveContact(contact.hash + i);
-					physique.onRemoveContact(contact.hash + i + 'B');
+					physique.onRemoveContact(contact.hash + contact.vHash);
+					physique.onRemoveContact(contact.hash + contact.vHash + 'B');
 					manifold.contacts.splice(i, 1);
 				}
 
@@ -1437,6 +1434,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			mesh.body.updateInBroadphase();
 		};
 
+		this.reset = function(){
+			oldHits = {};
+			this.bodies = {};
+			Broadphase.reset();
+		};
+
 		this.onDebugHelperArrow = new Function();
 		this.onNewContact = new Function();
 		this.onUpdateContact = new Function();
@@ -1468,7 +1471,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					if (body.asleep) {
 						body.asleep = false;
 						body.wantToSleep = 0;
-						debugger;
 						body.invMass = body.storedInvMass;
 						body.invInertiaTensor = body.storedInvInertiaTensor;
 					}
@@ -1643,8 +1645,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					body.position.x += scale * body.velocity.x * dt;
 					body.position.y += scale * body.velocity.y * dt;
 					body.position.z += scale * body.velocity.z * dt;
-
-					if (isNaN(body.position.x)) debugger;
 
 					var v = (new THREE.Vector3(body.angularVelocity.x * angularScale.x, body.angularVelocity.y * angularScale.y, body.angularVelocity.z * angularScale.z)).multiplyScalar(dt).multiplyScalar(scale);
 					// 	e = (new THREE.Euler()).setFromVector3(v),
