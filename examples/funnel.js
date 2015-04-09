@@ -80,7 +80,7 @@ define(function(){
 
 			if (!running) return;
 			this.spawnObject();
-			nextRun = setTimeout(this.startDropping.bind(this), 100);
+			nextRun = setTimeout(this.startDropping.bind(this), 400);
 		};
 
 		this.stop = function(){
@@ -107,8 +107,11 @@ define(function(){
 				zPos = Math.sin(angle) * (Settings.width * 0.5 + Settings.pipeWidth),
 				// xPos = (2 * Math.random() - 1) * (1 * Settings.width) + Settings.pipeWidth,
 				// zPos = (2 * Math.random() - 1) * (1 * Settings.width) + Settings.pipeWidth,
-				bodyType = (Math.random() > 0.5 ? BODY_CUBE : BODY_SPHERE),
-				meshType = (bodyType == BODY_CUBE ? MESH_BOX : MESH_SPHERE),
+				meshTypes = [MESH_BOX, MESH_SPHERE],
+				bodyTypes = [BODY_CUBE, BODY_SPHERE],
+				bodyMeshI = parseInt(Math.random() * meshTypes.length),
+				bodyType = bodyTypes[bodyMeshI],
+				meshType = meshTypes[bodyMeshI],
 				scale = 1.0,
 				dimensions = (bodyType == BODY_CUBE ? (new THREE.Vector3(1.0, 1.0, 1.0)).multiplyScalar(scale) : {radius: 0.75*scale });
 

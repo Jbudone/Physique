@@ -2,6 +2,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 	Keys.add('BODY_CUBE');
 	Keys.add('BODY_SPHERE');
+	Keys.add('BODY_TETRAHEDRON');
+	Keys.add('BODY_OCTAHEDRON');
 	Keys.add('BODY_FLOOR');
 
 
@@ -28,10 +30,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			minWakeDepth: 0.1, // NOTE: 0.04 too small
 			minIterationsBeforeSleep: 8*60,//20, // NOTE: 20 minimum for ball rolling problem
 
-			velocityIterations: 10,
+			velocityIterations: 20,
 
 			solveWorstContactsFirst: true,
 			useIslands: false,
+			useIslandsDEBUG: false,
 			onlyRemoveOnePointPerStep: true,
 
 			persistentContactDistanceThreshold: 0.3,
@@ -305,7 +308,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			// FIXME: improve this
 			this.hashContactVerts = function(contact){
-				return Math.max(contact.originA.i, contact.originB.i) * 10000 + Math.min(contact.originA.i, contact.originB.i);
+				return Math.max(contact.originA.i, contact.originB.i) * 10000 + '' + Math.min(contact.originA.i, contact.originB.i);
 			};
 
 			this.updateContact = function(contact){
@@ -738,7 +741,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				};
 			};
 
-			var TEST_UNOPTIMIZED_ISLANDS = true;
+			var TEST_UNOPTIMIZED_ISLANDS = this.world.useIslandsDEBUG;
 			if (this.world.useIslands || TEST_UNOPTIMIZED_ISLANDS) {
 
 				if (TEST_UNOPTIMIZED_ISLANDS) {
@@ -1344,6 +1347,20 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				mesh.body.invInertiaTensor = 1 / (_inertia);
 				mesh.body.static = false;
 
+			} else if (bodyType === BODY_TETRAHEDRON) {
+
+				var _inertia = 1/20 * mass * 2*Math.pow(mesh.body.radius,2);
+				mesh.body.invMass = 1 / (mass);
+				mesh.body.invInertiaTensor = 1 / (_inertia);
+				mesh.body.static = false;
+
+			} else if (bodyType === BODY_OCTAHEDRON) {
+
+				var _inertia = 1/5 * mass * Math.pow(mesh.body.radius,2);
+				mesh.body.invMass = 1 / (mass);
+				mesh.body.invInertiaTensor = 1 / (_inertia);
+				mesh.body.static = false;
+
 			} else if (bodyType === BODY_FLOOR) {
 
 				mesh.body.invMass = 0.0;
@@ -1358,7 +1375,15 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			mesh.body.velocity = new THREE.Vector3();
 			mesh.body.angularVelocity = new THREE.Vector3();
 			mesh.body.impulse = [0,0,0,0,0,0];
+
 			mesh.body.asleep = false;
+			if (mesh.settings.asleep) {
+				mesh.body.storedInvMass = mesh.body.invMass;
+				mesh.body.storedInvInertiaTensor = mesh.body.invInertiaTensor;
+				mesh.body.invMass = 0;
+				mesh.body.invInertiaTensor = 0;
+				mesh.body.asleep = true;
+			}
 			mesh.body.manifolds = {};
 			mesh.body.island = null;
 			mesh.body.wantToSleep = 0;
@@ -1476,12 +1501,24 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					}
 					Broadphase.updateAABB(body);
 					Broadphase.updateBodyInBroadphase(body);
+				} else {
+
+					// FIXME: this shouldn't be necessary, but checking just in case
+					Broadphase.updateAABB(body);
+					Broadphase.updateBodyInBroadphase(body);
 				}
 			}
 
 
+			Profiler.profile('maintainManifolds');
 			this.updateManifolds(); // NOTE: need to update manifolds BEFORE updating particular contacts below
+			Profiler.profileEnd('maintainManifolds');
+
+			Profiler.profile('Broadphase');
 			var hits = Broadphase.sweepAndPrune();
+			Profiler.profileEnd('Broadphase');
+
+			Profiler.profile('Narrowphase');
 			for (var hitHash in hits) {
 
 				var hit = hits[hitHash],
@@ -1571,6 +1608,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					bodyB.material.color.b = 0.0;
 				}
 			}
+			Profiler.profileEnd('Narrowphase');
 
 			if (oldHits) {
 				for (var oldHitHash in oldHits) {
@@ -1610,7 +1648,9 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			}
 			oldHits = hits;
 
+			Profiler.profile('PGS');
 			this.solveConstraints();
+			Profiler.profileEnd('PGS');
 
 			// Integrate changes
 			for (var uid in this.bodies) {

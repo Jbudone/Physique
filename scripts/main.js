@@ -98,11 +98,13 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		};
 
 		physique.onUpdateContact = function(hash, point){
+			if (!debugContacts.hasOwnProperty(hash)) return;
 			var mesh = debugContacts[hash].mesh;
 			mesh.position.copy(point);
 		};
 
 		physique.onRemoveContact = function(hash){
+			if (!debugContacts.hasOwnProperty(hash)) return;
 			var mesh = debugContacts[hash].mesh;
 			renderer.remove(mesh);
 			delete debugContacts[hash];
@@ -185,6 +187,12 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 				scene.stop();
 				scene.reset();
 				physique.reset();
+
+				for (var contactID in debugContacts) {
+					var mesh = debugContacts[contactID].mesh;
+					renderer.remove(mesh);
+					delete debugContacts[contactID];
+				}
 			};
 
 			scene.stop();
@@ -210,6 +218,9 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		addScene('rolling-ball', "Ball Roll");
 		addScene('box-stacking', "Box Stacking");
 		addScene('funnel', "Funnel");
+		addScene('rand-stack', "Random Stack");
+		addScene('catapult', "Catapult");
+		// addScene('wall', "The Wall");
 
 
 		// Load default scene

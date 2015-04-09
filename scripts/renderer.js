@@ -3,6 +3,8 @@ define(function(){
 	Keys.add('MESH_BOX');
 	Keys.add('MESH_SPHERE');
 	Keys.add('MESH_PLANE');
+	Keys.add('MESH_TETRAHEDRON');
+	Keys.add('MESH_OCTAHEDRON');
 
 	var Renderer = function(components){
 
@@ -25,6 +27,8 @@ define(function(){
 		};
 		texturePack.textureMap[MESH_BOX] = 'stone';
 		texturePack.textureMap[MESH_SPHERE] = 'stone';
+		texturePack.textureMap[MESH_TETRAHEDRON] = 'stone';
+		texturePack.textureMap[MESH_OCTAHEDRON] = 'stone';
 		texturePack.textureMap[MESH_PLANE] = 'grass';
 
 		this.camera = camera;
@@ -257,6 +261,35 @@ define(function(){
 				material = new THREE.MeshBasicMaterial( { color: 0x000000 } );
 				mesh = new THREE.Mesh( geometry, material );
 				this.applyTexture(mesh, texturePack.textureMap[MESH_PLANE]);
+
+				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
+			} else if (meshProps.type === MESH_TETRAHEDRON) {
+
+				meshProps = _.defaults(_meshProps, {
+					dimensions: { radius: 0.75 }
+				});
+
+
+				geometry = new THREE.TetrahedronGeometry( meshProps.dimensions.radius );
+				material = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+				mesh = new THREE.Mesh( geometry, material );
+				mesh.radius = meshProps.dimensions.radius;
+				this.applyTexture(mesh, texturePack.textureMap[MESH_TETRAHEDRON]);
+
+				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
+
+			} else if (meshProps.type === MESH_OCTAHEDRON) {
+
+				meshProps = _.defaults(_meshProps, {
+					dimensions: { radius: 0.75 }
+				});
+
+
+				geometry = new THREE.OctahedronGeometry( meshProps.dimensions.radius );
+				material = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+				mesh = new THREE.Mesh( geometry, material );
+				mesh.radius = meshProps.dimensions.radius;
+				this.applyTexture(mesh, texturePack.textureMap[MESH_OCTAHEDRON]);
 
 				if (_meshProps.hasOwnProperty('position')) mesh.position.add(_meshProps.position);
 			} else {

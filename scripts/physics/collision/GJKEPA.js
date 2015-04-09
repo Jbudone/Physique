@@ -1,10 +1,5 @@
 define(['physics/memstore'], function(MemStore){
 
-	/* TODO
-	 * 	- memstore
-	 * 	- adjust iFroze
-	 */
-
 	var GJKEPA = function(){
 
 		var maximumIterationsOfGJK = 0;

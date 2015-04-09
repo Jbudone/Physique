@@ -50,10 +50,10 @@ define(function(){
 
 		report: function(label){
 			
-			console.log("Profiler Report");
-			console.log("==================");
 			if (label == undefined) {
 
+				console.log("Profiler Report");
+				console.log("==================");
 				for (var label in profiles) {
 					this.report(label);
 				}

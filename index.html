@@ -68,30 +68,20 @@
 			- Point joint: machine w/ claw to turn, go down, grab cube, raise up, turn and drop cube
 			- https://www.youtube.com/watch?v=iYlG14qg7Vs
 			- https://www.youtube.com/watch?v=viLuuGIDuDk
-
-
-
-	* Mouse constraint
-	* Sleep mode; realistic timing + delta + settings
-	* Speed improvements
-	* Reset scene
 	
 
+
+
 	CR RESEARCH FIXING
-		- Baumgarte
 		- Restitution
-		- Penetration solver
-		- Order of algorithm (applying force, damping velocity, applying impulses, etc.)
-		- dt / inv_dt... 
 		- mass has no effect?
-		- better sleeping
 
 	Fixup (GDC2006)
 		- Check if deleting too early (depth <= 0, distance > 0.09) ?
 		- Check GDC2006!
 		- Check margin/distance depth (negative depth?) - if max depth is 0.09 instead of 0.009 then causes artifacts, perhaps need to modify baumgarte term for negative depth?
 		- Check feature points correct?
-		- Islands: improve efficiency
+		- Islands: improve efficiency + fix air islands + fix double static objects (catapult)
 		- Shock propagation: propagate weight? (saved article)
 
 
@@ -99,10 +89,8 @@
 		- Spatial data structure
 		- misc. constraints
 		- Code cleanup!!
-		- sleep->wake invMass==0 bug (after moving with mouse..should wake up as soon as we move the object)
 		- Abstract shapes
 		- More demos
-		- Allow rotating objects, scaling.. report scene
 
 
 		Note: fixes so far..
