@@ -68,6 +68,8 @@ define(function(){
 					var loadNext = function(){
 
 						if (texturesToLoad.length == 0) {
+							this.loadSkybox().then(function(){ console.log('loaded skybox..');
+							}, function(err){ console.error('error loading skybox..'); });
 							succeeded(renderer);
 							return;
 						}
@@ -94,7 +96,10 @@ define(function(){
 									delete texturePack.textureList[textureToLoad.id].loading;
 
 									if (texturesToLoad.length === 0) {
+										_me.loadSkybox().then(function(){ console.log('loaded skybox..');
+										}, function(err){ console.error('error loading skybox..'); });
 										succeeded(renderer);
+
 									} else {
 										loadNext();
 									}
@@ -110,11 +115,11 @@ define(function(){
 
 					loadNext();
 
-					this.loadSkybox().then(function(){
-						loadNext();
-					}, function(err){
-						failed(err);
-					});
+					// this.loadSkybox().then(function(){
+					// 	loadNext();
+					// }, function(err){
+					// 	failed(err);
+					// });
 
 				} catch(e) {
 					failed(e);
