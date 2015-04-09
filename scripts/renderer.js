@@ -114,6 +114,7 @@ define(function(){
 					};
 
 					loadNext();
+					succeeded(renderer);
 
 					// this.loadSkybox().then(function(){
 					// 	loadNext();
