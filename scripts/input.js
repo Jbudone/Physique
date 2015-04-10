@@ -136,10 +136,9 @@ define(function(){
 				raycaster.active = false;
 				
 				if (raycaster.holdingOnto) {
-					raycaster.holdingOnto.static = false;
-					raycaster.holdingOnto.invMass = raycaster.holdingOnto.storedInvMass;
-					raycaster.holdingOnto.invInertiaTensor = raycaster.holdingOnto.storedInvInertiaTensor;
-					if (raycaster.holdingOnto.invMass == 0) debugger;
+					raycaster.holdingOnto.body.static = false;
+					raycaster.holdingOnto.body.invMass = raycaster.holdingOnto.body.storedInvMass;
+					raycaster.holdingOnto.body.invInertiaTensor = raycaster.holdingOnto.body.storedInvInertiaTensor;
 					raycaster.holdingOnto = null;
 				}
 			}

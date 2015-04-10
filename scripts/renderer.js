@@ -18,7 +18,7 @@ define(function(){
 		var texturePack = {
 
 			textureList: {
-				stone: { file: 'stone.jpg', loading:[] },
+				stone: { file: 'stone.png', loading:[] },
 				grass: { file: 'grass.jpg', options: { repeat: true }, loading:[] }
 			},
 
@@ -115,12 +115,6 @@ define(function(){
 
 					loadNext();
 					succeeded(renderer);
-
-					// this.loadSkybox().then(function(){
-					// 	loadNext();
-					// }, function(err){
-					// 	failed(err);
-					// });
 
 				} catch(e) {
 					failed(e);

@@ -1,4 +1,4 @@
-define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/collision/broadphase', 'physics/memstore'], function(Narrowphase, Island, Broadphase, MemStore){
+define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/collision/broadphase', 'physics/memstore', 'physics/body'], function(Narrowphase, Island, Broadphase, MemStore, Body){
 
 	Keys.add('BODY_CUBE');
 	Keys.add('BODY_SPHERE');
@@ -46,9 +46,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 		};
 
 
-		var mass = 1.0;
-
-
 		/*****************************************************************
 		 *****************************************************************
 		 						Collision Resolution
@@ -73,100 +70,20 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 			this.manifold = manifold;
 
-			this.normal = contact.normal;
-			this.vertexA = contact.originA;
-			this.vertexB = contact.originB;
 			this.localA = contact.localA;
 			this.localB = contact.localB;
 			this.refPoint = contact.refPoint; // midpoint between vertexA and vertexB
-			this.depth = contact.depth;
 
-			// Find a tangential basis: http://box2d.org/2014/02/computing-a-basis/
-			if (Math.abs(this.normal.x) >= 0.57735) {
-				this.tangent1 = new THREE.Vector3( this.normal.y, -this.normal.x, 0.0 );
-			} else {
-				this.tangent1 = new THREE.Vector3( 0.0, this.normal.z, -this.normal.y );
-			}
-			this.tangent1.normalize();
-			this.tangent2 = new THREE.Vector3();
-			this.tangent2.copy(this.normal).cross(this.tangent1);
+
 
 			this.impulse = 0;
 			this.impulseT1 = 0;
 			this.impulseT2 = 0;
 			this.appliedImpulse =0;
-			this.appliedPushImpulse = 0;
-
-			this.rows = [];
-
-			/*
-			this.isPointInContact = function(point, body){
-
-				for (var i=0; i<body.geometry.faces.length; ++i) {
-					var face = body.geometry.faces[i],
-						pointNorm = body.geometry.vertices[face.a].clone().applyQuaternion(body.quaternion).add(body.position).sub(point);
-					if (face.normal.clone().applyQuaternion(body.quaternion).dot(pointNorm) < 0) {
-						debugger;
-						return false;
-					}
-				}
-				return true;
-			};
-			*/
 
 			this.remove = function(){
 
 			};
-
-			this.addConstraint = function(){
-				this.rows.push(new Constraint());
-				var row = this.rows[this.rows.length-1];
-				this.setJacobian(row);
-			};
-
-			this.setJacobian = function(row){
-
-				/*
-				if (this.bodyA && this.bodyA.invMass !== 0) {
-					row.J[0] = this.normal.x;
-					row.J[1] = this.normal.y;
-					row.J[2] = this.normal.z;
-
-					var tangent = this.vertexA.clone().sub(this.bodyA.position).multiplyScalar(TEST_ScaleT1).cross( this.normal ); // FIXME: WHAT IS THIS?!
-
-					if (TEST_NormTangent) {
-						tangent.normalize();
-					}
-
-					row.J[3] = tangent.x;
-					row.J[4] = tangent.y;
-					row.J[5] = tangent.z;
-				} else {
-					row.J[0] = 0; row.J[1] = 0; row.J[2] = 0;
-					row.J[3] = 0; row.J[4] = 0; row.J[5] = 0;
-				}
-
-				if (this.bodyB && this.bodyB.invMass !== 0) {
-					row.J[6] = -this.normal.x;
-					row.J[7] = -this.normal.y;
-					row.J[8] = -this.normal.z;
-
-					var tangent = this.vertexB.clone().sub(this.bodyB.position).multiplyScalar(TEST_ScaleT2).cross( this.normal ); // FIXME: WHAT IS THIS?!
-
-					if (TEST_NormTangent) {
-						tangent.normalize();
-					}
-					row.J[9]  = tangent.x;
-					row.J[10] = tangent.y;
-					row.J[11] = tangent.z;
-				} else {
-					row.J[6] = 0; row.J[7] = 0; row.J[8] = 0;
-					row.J[9] = 0; row.J[10] = 0; row.J[11] = 0;
-				}
-				*/
-			};
-
-			this.addConstraint();
 
 			this.update = function(newInfo){
 
@@ -174,6 +91,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					this.normal = contact.normal;
 					this.vertexA = contact.originA;
 					this.vertexB = contact.originB;
+					this.rA = contact.originA.clone().sub(contact.bodyA.position);
+					this.rB = contact.originB.clone().sub(contact.bodyB.position);
+					this.depth = contact.depth;
+
+					// Find a tangential basis: http://box2d.org/2014/02/computing-a-basis/
 					if (Math.abs(this.normal.x) >= 0.57735) {
 						this.tangent1 = new THREE.Vector3( this.normal.y, -this.normal.x, 0.0 );
 					} else {
@@ -183,109 +105,15 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					this.tangent2 = new THREE.Vector3();
 					this.tangent2.copy(this.normal).cross(this.tangent1);
 
-					// if (TEST_NormTangent) {
-					// 	this.tangent.normalize();
-					// 	this.tangent2.normalize();
-					// }
-					this.depth = contact.depth;
-					// this.setJacobian(this.rows[0]);
 				}
 
 				if (this.depth > physique.world.minDepthToWakeUp) {
 					this.bodyA.wantToSleep = 0;
 					this.bodyB.wantToSleep = 0;
 				}
-
-
-				/*
-				this.JDiagABInv = 0;
-				var denom1 = 0, denom2 = 0;
-				if (this.bodyA && this.bodyA.invMass !== 0) {
-					// denom1 = this.bodyA.invMass + this.normal.dot( this.tangent.clone().multiplyScalar(this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
-					denom1 = this.bodyA.invMass + this.normal.dot( this.tangent1.clone().multiplyScalar(TEST_DenomFactor1*this.bodyA.invInertiaTensor).cross( this.vertexA.clone().sub(this.bodyA.position) ) );
-				}
-
-				if (this.bodyB && this.bodyB.invMass !== 0) {
-					denom2 = this.bodyB.invMass - this.normal.dot( this.tangent2.clone().multiplyScalar(TEST_DenomFactor2*this.bodyB.invInertiaTensor).cross( this.vertexB.clone().sub(this.bodyB.position) ) );
-				}
-
-				var relaxation = 1.0;
-				this.JDiagABInv = relaxation / (denom1 + denom2);
-
-
-
-
-
-
-
-
-				for (var i=0; i<this.rows.length; ++i) {
-					var row = this.rows[i];
-
-					// Compute B  (J*M^-1)
-					if (this.bodyA && this.bodyA.invMass !== 0) {
-						row.B[0] = this.bodyA.invMass * row.J[0];
-						row.B[1] = this.bodyA.invMass * row.J[1];
-						row.B[2] = this.bodyA.invMass * row.J[2];
-
-						row.B[3] = this.bodyA.invInertiaTensor * row.J[3]; // FIXME: THIS IS TOTALLY WRONG FOR INERTIA
-						row.B[4] = this.bodyA.invInertiaTensor * row.J[4];
-						row.B[5] = this.bodyA.invInertiaTensor * row.J[5];
-					} else {
-						row.B[0] = 0; row.B[1] = 0; row.B[2] = 0;
-						row.B[3] = 0; row.B[4] = 0; row.B[5] = 0;
-					}
-
-					if (this.bodyB && this.bodyB.invMass !== 0) {
-						row.B[6] = this.bodyB.invMass * row.J[6];
-						row.B[7] = this.bodyB.invMass * row.J[7];
-						row.B[8] = this.bodyB.invMass * row.J[8];
-
-						row.B[9]  = this.bodyB.invInertiaTensor * row.J[9]; // FIXME: THIS IS TOTALLY WRONG FOR INERTIA
-						row.B[10] = this.bodyB.invInertiaTensor * row.J[10];
-						row.B[11] = this.bodyB.invInertiaTensor * row.J[11];
-					} else {
-						row.B[6] = 0; row.B[7] = 0; row.B[8] = 0;
-						row.B[9] = 0; row.B[10] = 0; row.B[11] = 0;
-					}
-
-
-					// Compute D  ...?
-					row.D = 0;
-					for (var ji=0; ji<12; ++ji){
-						row.D += row.B[ji] * row.J[ji];
-					}
-
-
-					row.JdotV = 0;
-					var idt = 1/dt;
-					if (this.bodyA && this.bodyA.invMass !== 0) {
-						row.JdotV += row.J[0] * idt * this.bodyA.velocity.x;
-						row.JdotV += row.J[1] * idt * this.bodyA.velocity.y;
-						row.JdotV += row.J[2] * idt * this.bodyA.velocity.z;
-
-						row.JdotV += row.J[3] * idt * this.bodyA.angularVelocity.x;
-						row.JdotV += row.J[4] * idt * this.bodyA.angularVelocity.y;
-						row.JdotV += row.J[5] * idt * this.bodyA.angularVelocity.z;
-					}
-
-					if (this.bodyB && this.bodyB.invMass !== 0) {
-						row.JdotV += row.J[6]  * idt * this.bodyB.velocity.x;
-						row.JdotV += row.J[7]  * idt * this.bodyB.velocity.y;
-						row.JdotV += row.J[8]  * idt * this.bodyB.velocity.z;
-
-						row.JdotV += row.J[9]  * idt * this.bodyB.angularVelocity.x;
-						row.JdotV += row.J[10] * idt * this.bodyB.angularVelocity.y;
-						row.JdotV += row.J[11] * idt * this.bodyB.angularVelocity.z;
-					}
-
-					var velNormal = this.bodyA.angularVelocity.clone().cross( this.vertexA ).add( this.bodyA.position ).dot( this.normal );
-					velNormal 	 -= this.bodyB.angularVelocity.clone().cross( this.vertexB ).add( this.bodyB.position ).dot( this.normal );
-					var bias = velNormal * 0.1;
-					row.JdotV -= (bias * idt);
-				}
-				*/
 			};
+
+			this.update(contact);
 		};
 
 		var islands = {};
@@ -673,16 +501,13 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 				var manifold = contactManifolds[manifoldID];
 				for (var i=0; i<manifold.contacts.length; ++i) {
-				// for (var contactID in manifold.contacts) {
 
 					var contact = manifold.contacts[i];
 
 					if ((contact.bodyA.asleep || contact.bodyA.static) && (contact.bodyB.asleep || contact.bodyB.static)) {
 						continue;
 					}
-					// contact.appliedImpulse = 0;
 
-					// ReactPhysics way
 					// Warmstart
 					contact.impulse *= physique.world.warmth;
 					var rA = contact.vertexA.clone().sub(contact.bodyA.position),
@@ -713,10 +538,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 					if (isNaN(contact.bodyA.velocity.x)) debugger;
 					if (isNaN(contact.bodyB.velocity.x)) debugger;
-
-
-					contact.appliedPushImpulse = 0;
-					// contact.impulse = 0;
 				}
 			}
 
@@ -930,47 +751,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 
 
-					/*
-					while (manifoldsToAdd.length) {
-						var manifold = manifoldsToAdd[0];
-						manifoldsToAdd.splice(0, 1);
-
-						var island = null;
-						if (!manifold.bodyA.island || !manifold.bodyB.island) {
-							if (!manifold.bodyA.island && !manifold.bodyB.island) {
-								// Neither bodies belong to an island yet
-							} else if (!manifold.bodyA.island) {
-								manifold.bodyA.island = manifold.bodyB.island;
-							} else {
-								manifold.bodyB.island = manifold.bodyA.island;
-							}
-							island = manifold.bodyA.island;
-						} else if (manifold.bodyA.island == manifold.bodyB.island) {
-							island = manifold.bodyA.island;
-						} else {
-							// Both bodies belong to different islands..need to merge the islands
-							island = manifold.bodyA.island.mergeWith( manifold.bodyB.island );
-						}
-
-						if (!island) {
-							var island = new Island();
-							islands[island.uid] = island;
-							manifold.island = island;
-							manifold.bodyA.island = island;
-							manifold.bodyB.island = island;
-						}
-
-						island.addManifold(manifold);
-
-						for (var eIslandID in islands) {
-							if (islands[eIslandID].count == 0) {
-								// In case we merged with this island..
-								delete islands[eIslandID];
-							}
-						}
-					}
-					*/
-
 
 					Profiler.profileEnd("islandCreation");
 				}
@@ -1113,16 +893,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			if ((contact.bodyA.static || contact.bodyA.asleep) &&
 				(contact.bodyB.static || contact.bodyB.asleep)) return;
 
-						var row = contact.rows[0], // contact constraint
-							JdotV = 0,
-							delta = 0;
-
-
-
-
-						var rA = contact.vertexA.clone().sub(contact.bodyA.position),
-							rB = contact.vertexB.clone().sub(contact.bodyB.position),
+						var rA = contact.rA,
+							rB = contact.rB,
 							dV = 0,
+							JdotV = 0,
+							delta = 0,
 							deltaVDotN = 0,
 							JV = 0,
 							MA = 0,
@@ -1220,17 +995,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
 
 
-						// ReactPhysics3D way
-						// FIXME: may need to reverse normal (they use triangle.normal)
-						// FIXME: rA = pA - a, rB = pB - b ... they use 2 contact points.. transform contact
-						// FIXME: double check effective mass: http://danielchappuis.ch/download/ConstraintsDerivationRigidBody3D.pdf  
-						// point into A or B space (probably rotate/add position). 
-						// 	pA = triangle->computeClosestPointOfObject(suppPointsA)
-						// 	pB = body2Tobody1.getInverse() * triangle->computeClosestPointOfObject(suppPointsB)
-						var rA = contact.vertexA.clone().sub(contact.bodyA.position),
-							rB = contact.vertexB.clone().sub(contact.bodyB.position),
-							dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+						// var dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						// dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
 						var deltaVDotN = dV.dot(contact.normal),
 							JV = deltaVDotN;
@@ -1307,7 +1073,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				if (physique.world.useIslands && manifold.island) manifold.island.removeManifold(manifold);
 
 				for (var i=0; i<manifold.contacts.length; ++i) {
-				// for (var contactID in manifold.contacts) {
 					var contact = manifold.contacts[i];
 					physique.onRemoveContact(contact.hash + contact.vHash);
 					physique.onRemoveContact(contact.hash + contact.vHash + 'B');
@@ -1328,135 +1093,27 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				throw new Error("Body uid ("+mesh.uid+") already exists");
 			}
 
-			this.bodies[mesh.uid] = mesh.body;
+			var body = new Body(mesh.body, mesh.settings);
+			this.bodies[mesh.uid] = body;
 
-			var bodyType = mesh.settings.body;
-			if (bodyType === BODY_CUBE) {
 
-				var extent = 2; // FIXME: assuming a cube (same width/height/depth)
-				// FIXME: giving cube more inertia by doubling its extent... this seems to help in box stacking
-				var _inertia = 1/12 * mass * (2*extent*extent);
-				mesh.body.invMass = 1 / (mass);
-				mesh.body.invInertiaTensor = 1 / (_inertia);
-				mesh.body.static = false;
 
-			} else if (bodyType === BODY_SPHERE) {
-
-				var _inertia = 2/5 * mass * Math.pow(mesh.body.radius,2);
-				mesh.body.invMass = 1 / (mass);
-				mesh.body.invInertiaTensor = 1 / (_inertia);
-				mesh.body.static = false;
-
-			} else if (bodyType === BODY_TETRAHEDRON) {
-
-				var _inertia = 1/20 * mass * 2*Math.pow(mesh.body.radius,2);
-				mesh.body.invMass = 1 / (mass);
-				mesh.body.invInertiaTensor = 1 / (_inertia);
-				mesh.body.static = false;
-
-			} else if (bodyType === BODY_OCTAHEDRON) {
-
-				var _inertia = 1/5 * mass * Math.pow(mesh.body.radius,2);
-				mesh.body.invMass = 1 / (mass);
-				mesh.body.invInertiaTensor = 1 / (_inertia);
-				mesh.body.static = false;
-
-			} else if (bodyType === BODY_FLOOR) {
-
-				mesh.body.invMass = 0.0;
-				mesh.body.invInertiaTensor = 0.0;
-				mesh.body.static = true;
-
-			} else {
-				throw new Error("Adding undefined body: "+ bodyType);
-			}
-
-			mesh.body.bodyType = bodyType;
-			mesh.body.velocity = new THREE.Vector3();
-			mesh.body.angularVelocity = new THREE.Vector3();
-			mesh.body.impulse = [0,0,0,0,0,0];
-
-			mesh.body.asleep = false;
-			if (mesh.settings.asleep) {
-				mesh.body.storedInvMass = mesh.body.invMass;
-				mesh.body.storedInvInertiaTensor = mesh.body.invInertiaTensor;
-				mesh.body.invMass = 0;
-				mesh.body.invInertiaTensor = 0;
-				mesh.body.asleep = true;
-			}
-			mesh.body.manifolds = {};
-			mesh.body.island = null;
-			mesh.body.wantToSleep = 0;
-
-			mesh.body.addManifold = function(manifold){
+			
+			body.addManifold = function(manifold){
 				this.manifolds[manifold.uid] = manifold;
-
-				if (physique.world.useIslands) {
-					if (manifold.island) {
-						if (this.island != manifold.island) {
-							if (!this.island) {
-								this.island = manifold.island;
-							} else {
-								// We currently belong to two islands, need to merge the two islands..
-								var newIsland = this.island.mergeWith( manifold.island );
-								this.island = newIsland;
-							}
-						}
-					} else {
-						debugger; // This should never occur!
-					}
-				}
 			};
 
-			mesh.body.removeManifold = function(manifold){
+			body.removeManifold = function(manifold){
 				delete this.manifolds[manifold.uid];
 			};
 
-			mesh.body.deltaV = new THREE.Vector3(0,0,0);
-			mesh.body.deltaW = new THREE.Vector3(0,0,0);
-			mesh.body.newVelocity = new THREE.Vector3(0,0,0);
-			mesh.body.newAngularVelocity = new THREE.Vector3(0,0,0);
-			mesh.body.applyImpulse = function(linear, angular, impulseMagnitude){
-
-				this.deltaV.add( linear.clone().multiplyScalar(impulseMagnitude) );
-				this.deltaW.add( angular.clone().multiplyScalar(impulseMagnitude) );
-
-				// this.velocity.add( linear.clone().multiplyScalar(impulseMagnitude) );
-				// this.angularVelocity.add( angular.clone().multiplyScalar(impulseMagnitude) );
-			};
-
-
-			/*
-			mesh.body.updateRotation = function(dt){
-
-
-				// Update rotation
-				var q = new THREE.Quaternion(
-					this.angularVelocity.x * dt,
-					this.angularVelocity.y * dt,
-					this.angularVelocity.z * dt,
-					0
-				);
-
-				q.multiply( this.quaternion );
-
-				var half_dt = 0.5;
-				this.quaternion.x += half_dt * q.x;
-				this.quaternion.y += half_dt * q.y;
-				this.quaternion.z += half_dt * q.z;
-				this.quaternion.w += half_dt * q.w;
-				this.quaternion.normalize();
-
-			};
-		*/
-
-
-			mesh.body.updateInBroadphase = function(){
+			body.updateInBroadphase = function(){
 				Broadphase.updateAABB(this);
-				Broadphase.addBodyIntoBroadphase(this);
 			};
 
-			mesh.body.updateInBroadphase();
+			body.updateInBroadphase();
+			body.mesh.updateInBroadphase = body.updateInBroadphase;
+			Broadphase.addBodyIntoBroadphase(body);
 		};
 
 		this.reset = function(){
@@ -1488,8 +1145,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 					body.velocity.y += (this.world.gravity * dt);
 
-					Broadphase.updateAABB(body);
-					Broadphase.updateBodyInBroadphase(body);
+					Broadphase.updateAABB(body.mesh);
+					// Broadphase.updateBodyInBroadphase(body);
 				} else if (body.userMoved) {
 					body.userMoved = false;
 
@@ -1499,13 +1156,13 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						body.invMass = body.storedInvMass;
 						body.invInertiaTensor = body.storedInvInertiaTensor;
 					}
-					Broadphase.updateAABB(body);
-					Broadphase.updateBodyInBroadphase(body);
+					Broadphase.updateAABB(body.mesh);
+					// Broadphase.updateBodyInBroadphase(body);
 				} else {
 
 					// FIXME: this shouldn't be necessary, but checking just in case
-					Broadphase.updateAABB(body);
-					Broadphase.updateBodyInBroadphase(body);
+					Broadphase.updateAABB(body.mesh);
+					// Broadphase.updateBodyInBroadphase(body);
 				}
 			}
 
@@ -1663,34 +1320,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 				if (!body.static && !body.asleep) {
 
-					body.velocity.add(body.deltaV);
-					body.angularVelocity.add(body.deltaW);
-
-					/*
-					var scale = 1.0;
-					body.position.x += scale * body.velocity.x * dt;
-					body.position.y += scale * body.velocity.y * dt;
-					body.position.z += scale * body.velocity.z * dt;
-
-					var v = (new THREE.Vector3(body.angularVelocity.x * angularScale.x, body.angularVelocity.y * angularScale.y, body.angularVelocity.z * angularScale.z)).multiplyScalar(dt).multiplyScalar(scale),
-						e = (new THREE.Euler()).setFromVector3(v),
-						q = (new THREE.Quaternion()).setFromEuler(e);
-					body.quaternion.multiply(q);
-					// body.rotation.x += v.x;
-					// body.rotation.y += v.y;
-					// body.rotation.z += v.z;
-					*/
-
 					var scale = 1.0;
 					body.position.x += scale * body.velocity.x * dt;
 					body.position.y += scale * body.velocity.y * dt;
 					body.position.z += scale * body.velocity.z * dt;
 
 					var v = (new THREE.Vector3(body.angularVelocity.x * angularScale.x, body.angularVelocity.y * angularScale.y, body.angularVelocity.z * angularScale.z)).multiplyScalar(dt).multiplyScalar(scale);
-					// 	e = (new THREE.Euler()).setFromVector3(v),
-					// 	q = (new THREE.Quaternion()).setFromEuler(e);
-					// body.quaternion.multiply(q);
-					// body.rotation.add(v);
 					var q = new THREE.Quaternion(body.angularVelocity.x, body.angularVelocity.y, body.angularVelocity.z, 0);
 					q.multiply(body.quaternion);
 					body.quaternion.x += q.x * 0.5 * dt;
@@ -1756,13 +1391,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						}
 
 
-					// body.deltaV.multiplyScalar(0);
-					// body.deltaW.multiplyScalar(0);
-					// body.deltaV.multiplyScalar(damping);
-					// body.deltaW.multiplyScalar(damping);
-
-					Broadphase.updateAABB(body);
-					Broadphase.updateBodyInBroadphase(body);
+					Broadphase.updateAABB(body.mesh);
+					// Broadphase.updateBodyInBroadphase(body);
 				}
 			}
 		};

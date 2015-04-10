@@ -10,8 +10,8 @@ define(function(){
 		this.initialize = function(scene){
 
 			var offsetY = -0.9,
-				scale = 1.0,
-				extent = 3,
+				scale = 0.5,
+				extent = 6,
 				slit = 0.01;
 
 
@@ -22,6 +22,7 @@ define(function(){
 						type: MESH_BOX,
 						body: BODY_CUBE,
 						position: new THREE.Vector3(x*scale + Math.abs(x)*slit, offsetY + y*scale + Math.abs(y)*slit, 0),
+						dimensions: new THREE.Vector3(scale, scale scale),
 						asleep: true
 					});
 				}

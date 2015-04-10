@@ -123,7 +123,7 @@ define(function(){
 				rotation: new THREE.Vector3(0.0, 0.0, 0.0)
 			});
 
-			m.body.velocity.y -= 0.0;
+			m.body.body.velocity.y -= 0.0;
 
 			setTimeout(function(){
 				scene.removeMesh(m);

@@ -220,7 +220,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		addScene('funnel', "Funnel");
 		addScene('rand-stack', "Random Stack");
 		addScene('catapult', "Catapult");
-		// addScene('wall', "The Wall");
+		addScene('wall', "The Wall");
 
 
 		// Load default scene
@@ -263,7 +263,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 
 		moveDir2.applyQuaternion(qY);
 
-		mesh.body.velocity.add(moveDir2);
+		mesh.body.body.velocity.add(moveDir2);
 
 	};
 
@@ -425,27 +425,25 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 				if (intersects.length > 0) {
 					for (var i=0; i<intersects.length; ++i) {
 						var intersect = intersects[i];
-						if (intersect.object.static === false) {
+						if (intersect.object.body.static === false) {
 							if (activeMesh) {
-								activeMesh.static = false;
-								debugger;
-								activeMesh.invMass = activeMesh.storedInvMass;
-								activeMesh.invInertiaTensor = activeMesh.storedInvInertiaTensor;
-								if (activeMesh.invMass == 0) debugger;
+								activeMesh.body.static = false;
+								activeMesh.body.invMass = activeMesh.storedInvMass;
+								activeMesh.body.invInertiaTensor = activeMesh.storedInvInertiaTensor;
 							}
 
 							activeMesh = intersect.object;
 							activeMesh.distanceFromCamera = intersect.distance;
 							raycaster.holdingOnto = activeMesh;
-							activeMesh.velocity.multiplyScalar(0.0);
-							activeMesh.angularVelocity.multiplyScalar(0.0);
-							if (!activeMesh.asleep) {
-								activeMesh.storedInvMass = activeMesh.invMass;
-								activeMesh.storedInvInertiaTensor = activeMesh.invInertiaTensor;
-								activeMesh.invMass = 0.0;
-								activeMesh.invInertiaTensor = 0.0;
+							activeMesh.body.velocity.multiplyScalar(0.0);
+							activeMesh.body.angularVelocity.multiplyScalar(0.0);
+							if (!activeMesh.body.asleep) {
+								activeMesh.body.storedInvMass = activeMesh.body.invMass;
+								activeMesh.body.storedInvInertiaTensor = activeMesh.body.invInertiaTensor;
+								activeMesh.body.invMass = 0.0;
+								activeMesh.body.invInertiaTensor = 0.0;
 							}
-							raycaster.holdingOnto.static = true;
+							raycaster.holdingOnto.body.static = true;
 							break;
 						}
 					}

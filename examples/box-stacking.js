@@ -2,7 +2,7 @@ define(function(){
 
 	var Settings = {
 		offsetYOfObjects: 1.0,//1.5,
-		numObjects: 12
+		numObjects: 6
 	};
 
 	var Scene = function(){
