@@ -139,6 +139,7 @@ define(function(){
 					raycaster.holdingOnto.body.static = false;
 					raycaster.holdingOnto.body.invMass = raycaster.holdingOnto.body.storedInvMass;
 					raycaster.holdingOnto.body.invInertiaTensor = raycaster.holdingOnto.body.storedInvInertiaTensor;
+					raycaster.holdingOnto.body.updateState();
 					raycaster.holdingOnto = null;
 				}
 			}

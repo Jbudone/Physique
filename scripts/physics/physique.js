@@ -1155,6 +1155,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						body.wantToSleep = 0;
 						body.invMass = body.storedInvMass;
 						body.invInertiaTensor = body.storedInvInertiaTensor;
+						body.updateState();
 					}
 					Broadphase.updateAABB(body.mesh);
 					// Broadphase.updateBodyInBroadphase(body);
@@ -1199,12 +1200,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					bodyA.wantToSleep = 0;
 					bodyA.invMass = bodyA.storedInvMass;
 					bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
-					if (bodyA.material.hasOwnProperty('storedColor')) {
-						bodyA.material.color.r = bodyA.material.storedColor.r;
-						bodyA.material.color.g = bodyA.material.storedColor.g;
-						bodyA.material.color.b = bodyA.material.storedColor.b;
-						delete bodyA.material.storedColor;
-					}
 				}
 
 				if (bodyB.asleep && contact.depth > minDepthToWakeUp) {
@@ -1212,12 +1207,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					bodyB.wantToSleep = 0;
 					bodyB.invMass = bodyB.storedInvMass;
 					bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
-					if (bodyB.material.hasOwnProperty('storedColor')) {
-						bodyB.material.color.r = bodyB.material.storedColor.r;
-						bodyB.material.color.g = bodyB.material.storedColor.g;
-						bodyB.material.color.b = bodyB.material.storedColor.b;
-						delete bodyB.material.storedColor;
-					}
 				}
 
 				contact.hash = hitHash;
@@ -1251,19 +1240,8 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 				// FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
 				// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-				if (!bodyA.material.hasOwnProperty('storedColor') && !bodyA.static) {
-					bodyA.material.storedColor = _.clone(bodyA.material.color);
-					bodyA.material.color.r = bodyA.uid % 2 == 0 ? 1.0 : 0.0;
-					bodyA.material.color.g = bodyA.uid % 2 == 0 ? 0.0 : 1.0;
-					bodyA.material.color.b = 0.0;
-				}
-
-				if (!bodyB.material.hasOwnProperty('storedColor') && !bodyB.static) {
-					bodyB.material.storedColor = _.clone(bodyB.material.color);
-					bodyB.material.color.r = bodyB.uid % 2 == 0 ? 1.0 : 0.0;
-					bodyB.material.color.g = bodyB.uid % 2 == 0 ? 0.0 : 1.0;
-					bodyB.material.color.b = 0.0;
-				}
+				bodyA.updateState();
+				bodyB.updateState();
 			}
 			Profiler.profileEnd('Narrowphase');
 
@@ -1275,31 +1253,21 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							bodyA = oldHit.bodyA,
 							bodyB = oldHit.bodyB;
 
-						if (bodyA.material.hasOwnProperty('storedColor')) {
-							if (bodyA.asleep) {
-								bodyA.asleep = false;
-								bodyA.wantToSleep = 0;
-								bodyA.invMass = bodyA.storedInvMass;
-								bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
-							}
-							bodyA.material.color.r = bodyA.material.storedColor.r;
-							bodyA.material.color.g = bodyA.material.storedColor.g;
-							bodyA.material.color.b = bodyA.material.storedColor.b;
-							delete bodyA.material.storedColor;
+						if (bodyA.asleep) {
+							bodyA.asleep = false;
+							bodyA.wantToSleep = 0;
+							bodyA.invMass = bodyA.storedInvMass;
+							bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
 						}
+						bodyA.updateState();
 
-						if (bodyB.material.hasOwnProperty('storedColor')) {
-							if (bodyB.asleep) {
-								bodyB.asleep = false;
-								bodyB.wantToSleep = 0;
-								bodyB.invMass          = bodyB.storedInvMass;
-								bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
-							}
-							bodyB.material.color.r = bodyB.material.storedColor.r;
-							bodyB.material.color.g = bodyB.material.storedColor.g;
-							bodyB.material.color.b = bodyB.material.storedColor.b;
-							delete bodyB.material.storedColor;
+						if (bodyB.asleep) {
+							bodyB.asleep = false;
+							bodyB.wantToSleep = 0;
+							bodyB.invMass          = bodyB.storedInvMass;
+							bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
 						}
+						bodyB.updateState();
 					}
 				}
 			}
@@ -1382,11 +1350,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 								body.velocity.multiplyScalar(0.0);
 								body.angularVelocity.multiplyScalar(0.0);
 
-								if (!body.static) {
-									body.material.color.r = body.uid % 2 == 0 ? 0.2 : 0.4;
-									body.material.color.g = body.uid % 2 == 0 ? 0.4 : 0.2;
-									body.material.color.b = 0.2;
-								}
+								body.updateState();
 							}
 						}
 

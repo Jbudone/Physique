@@ -239,7 +239,42 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 		var mesh = scene.addMesh({
 			type: MESH_BOX,
 			body: BODY_CUBE,
-			position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z)
+			position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z),
+			mass: 30.0
+		});
+
+		var shootMultiplier = 20.0;
+		var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
+
+		var qX = new THREE.Quaternion(),
+			qY = new THREE.Quaternion(),
+			qZ = new THREE.Quaternion(),
+			m = new THREE.Matrix4(),
+			vY = new THREE.Vector3(0,1,0),
+			vX = new THREE.Vector3(1,0,0),
+			vZ = new THREE.Vector3(0,0,1);
+
+		qX.setFromAxisAngle( vY, -renderer.camera.phi );
+		vX.applyQuaternion(qX);
+		qY.setFromAxisAngle( vX, -renderer.camera.theta );
+		vY.multiply(qY);
+		qZ.setFromAxisAngle( vZ, renderer.camera.lambda );
+		qY.multiply(qX);
+		qY.multiply(qZ);
+
+		moveDir2.applyQuaternion(qY);
+
+		mesh.body.body.velocity.add(moveDir2);
+
+	};
+
+	var shootSphere = function(){
+
+		var mesh = scene.addMesh({
+			type: MESH_SPHERE,
+			body: BODY_SPHERE,
+			position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z),
+			mass: 30.0
 		});
 
 		var shootMultiplier = 20.0;
@@ -284,6 +319,8 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			isMoving |= MOVE_DOWN;
 		} else if (evt.keyCode === 32) {
 			shootCube();
+		} else if (evt.keyCode === 88) {
+			shootSphere();
 		} else if (evt.keyCode === 17 || evt.ctrlKey) {
 			isMoving |= MOVE_TURN;
 		}
@@ -430,6 +467,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 								activeMesh.body.static = false;
 								activeMesh.body.invMass = activeMesh.storedInvMass;
 								activeMesh.body.invInertiaTensor = activeMesh.storedInvInertiaTensor;
+								activeMesh.body.updateState();
 							}
 
 							activeMesh = intersect.object;
@@ -444,6 +482,7 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 								activeMesh.body.invInertiaTensor = 0.0;
 							}
 							raycaster.holdingOnto.body.static = true;
+							activeMesh.body.updateState();
 							break;
 						}
 					}
