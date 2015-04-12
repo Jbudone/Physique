@@ -3,7 +3,7 @@ define(function(){
 	var Settings = {
 
 		colorCollisions: false,
-		colorSleep: false
+		colorSleep: true
 	};
 
 	var Body = function(mesh, settings){
@@ -80,6 +80,18 @@ define(function(){
 		this.island = null;
 		this.wantToSleep = 0;
 
+
+		this.updateContacts = function(){
+			for (var manifoldID in this.manifolds) {
+				var manifold = this.manifolds[manifoldID];
+
+				for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[contactID];
+
+					contact.update();
+				}
+			}
+		};
 
 
 		var state = 0,

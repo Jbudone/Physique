@@ -109,14 +109,14 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			this.MBN = null;
 
 			this.remove = function(){
-				// this.rAT1.delete(); this.rAT1rA.delete();
-				// this.rBT1.delete(); this.rBT1rB.delete();
+				this.rAT1.delete(); this.rAT1rA.delete();
+				this.rBT1.delete(); this.rBT1rB.delete();
 
-				// this.rAT2.delete(); this.rAT2rA.delete();
-				// this.rBT2.delete(); this.rBT2rB.delete();
+				this.rAT2.delete(); this.rAT2rA.delete();
+				this.rBT2.delete(); this.rBT2rB.delete();
 
-				// this.rAN.delete(); this.rANrA.delete();
-				// this.rBN.delete(); this.rBNrB.delete();
+				this.rAN.delete(); this.rANrA.delete();
+				this.rBN.delete(); this.rBNrB.delete();
 			};
 
 			this.update = function(newInfo){
@@ -125,8 +125,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					this.normal = contact.normal;
 					this.vertexA = contact.originA;
 					this.vertexB = contact.originB;
-					this.rA = contact.originA.clone().sub(contact.bodyA.position);
-					this.rB = contact.originB.clone().sub(contact.bodyB.position);
 					this.depth = contact.depth;
 
 					// Find a tangential basis: http://box2d.org/2014/02/computing-a-basis/
@@ -138,37 +136,34 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					this.tangent1.normalize();
 					this.tangent2 = new THREE.Vector3();
 					this.tangent2.copy(this.normal).cross(this.tangent1);
-
-
-					this.rAT1 = MemStore.Vector3( this.rA ).cross( this.tangent1 );
-					this.rBT1 = MemStore.Vector3( this.rB ).cross( this.tangent1 );
-					this.rAT1rA = MemStore.Vector3( this.rAT1 ).cross( this.rA );
-					this.rBT1rB = MemStore.Vector3( this.rBT1 ).cross( this.rB );
-
-					this.rAT2 = MemStore.Vector3( this.rA ).cross( this.tangent2 );
-					this.rBT2 = MemStore.Vector3( this.rB ).cross( this.tangent2 );
-					this.rAT2rA = MemStore.Vector3( this.rAT2 ).cross( this.rA );
-					this.rBT2rB = MemStore.Vector3( this.rBT2 ).cross( this.rB );
-
-					if (badVec(this.rAT1) || badVec(this.rBT1) ||
-						badVec(this.rAT2) || badVec(this.rBT2) ||
-						badVec(this.rAT1rA) || badVec(this.rBT1rB) ||
-						badVec(this.rAT2rA) || badVec(this.rBT2rB)) debugger;
-
-					this.rAN = MemStore.Vector3( this.rA ).cross( this.normal );
-					this.rBN = MemStore.Vector3( this.rB ).cross( this.normal );
-					this.rANrA = MemStore.Vector3( this.rAN ).cross( this.rA );
-					this.rBNrB = MemStore.Vector3( this.rBN ).cross( this.rB );
-
-					this.MAT1 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT1rA.dot(this.tangent1);
-					this.MBT1 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT1rB.dot(this.tangent1);
-
-					this.MAT2 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT2rA.dot(this.tangent2);
-					this.MBT2 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT2rB.dot(this.tangent2);
-
-					this.MAN = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rANrA.dot(this.normal);
-					this.MBN = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBNrB.dot(this.normal);
 				}
+
+				this.rA = this.vertexA.clone().sub(this.bodyA.position);
+				this.rB = this.vertexA.clone().sub(this.bodyB.position);
+
+				this.rAT1 = MemStore.Vector3( this.rA ).cross( this.tangent1 );
+				this.rBT1 = MemStore.Vector3( this.rB ).cross( this.tangent1 );
+				this.rAT1rA = MemStore.Vector3( this.rAT1 ).cross( this.rA );
+				this.rBT1rB = MemStore.Vector3( this.rBT1 ).cross( this.rB );
+
+				this.rAT2 = MemStore.Vector3( this.rA ).cross( this.tangent2 );
+				this.rBT2 = MemStore.Vector3( this.rB ).cross( this.tangent2 );
+				this.rAT2rA = MemStore.Vector3( this.rAT2 ).cross( this.rA );
+				this.rBT2rB = MemStore.Vector3( this.rBT2 ).cross( this.rB );
+
+				this.rAN = MemStore.Vector3( this.rA ).cross( this.normal );
+				this.rBN = MemStore.Vector3( this.rB ).cross( this.normal );
+				this.rANrA = MemStore.Vector3( this.rAN ).cross( this.rA );
+				this.rBNrB = MemStore.Vector3( this.rBN ).cross( this.rB );
+
+				this.MAT1 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT1rA.dot(this.tangent1);
+				this.MBT1 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT1rB.dot(this.tangent1);
+
+				this.MAT2 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT2rA.dot(this.tangent2);
+				this.MBT2 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT2rB.dot(this.tangent2);
+
+				this.MAN = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rANrA.dot(this.normal);
+				this.MBN = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBNrB.dot(this.normal);
 
 				if (this.depth > physique.world.minDepthToWakeUp) {
 					this.bodyA.wantToSleep = 0;
@@ -599,11 +594,6 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulseT2) );
 
 
-
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 				}
 			}
 
@@ -974,39 +964,19 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 
 
-					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
-						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+					// Friction 1
+					var dVB = MemStore.Vector3( contact.bodyB.angularVelocity ).cross(rB).add( contact.bodyB.velocity ),
+						dVA = MemStore.Vector3( contact.bodyA.angularVelocity ).cross(rA).add( contact.bodyA.velocity );
+					dV = dVB.sub(dVA);
 
-						// Friction 1
-						var dVB = MemStore.Vector3( contact.bodyB.angularVelocity ).cross(rB).add( contact.bodyB.velocity ),
-							dVA = MemStore.Vector3( contact.bodyA.angularVelocity ).cross(rA).add( contact.bodyA.velocity );
-						dV = dVB.sub(dVA);
+					dVA.delete();
 
-					if (badVec(dVB) || badVec(dVA)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
-						dVA.delete();
-
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 						// dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
 						// dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
 						deltaVDotN = dV.dot(contact.tangent1);
 						JV = deltaVDotN;
 
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
 						deltaLambda = -JV / (contact.MAT1 + contact.MBT1);
 						lambdaTemp = contact.impulseT1;
@@ -1014,41 +984,24 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						contact.impulseT1 = Math.max(-maxImpulse, Math.min(maxImpulse, lambdaTemp + deltaLambda));
 						deltaLambda = contact.impulseT1 - lambdaTemp;
 
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
 						var tAM = MemStore.Vector3( contact.tangent1 ).multiplyScalar(-contact.bodyA.invMass * deltaLambda),
-							tBM = MemStore.Vector3( contact.tangent1 ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
+							tBM = MemStore.Vector3( contact.tangent1 ).multiplyScalar(contact.bodyB.invMass * deltaLambda),
+							rAM = MemStore.Vector3( contact.rAT1 ).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda),
+							rBM = MemStore.Vector3( contact.rBT1 ).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda);
 
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
 						contact.bodyA.velocity.add( tAM );
-						contact.bodyA.angularVelocity.add( contact.rAT1.multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
-
-					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
-						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+						contact.bodyA.angularVelocity.add( rAM );
 
 						contact.bodyB.velocity.add( tBM );
-						contact.bodyB.angularVelocity.add( contact.rBT1.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+						contact.bodyB.angularVelocity.add( rBM );
 
-					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
-						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
 						tAM.delete();
 						tBM.delete();
+						rAM.delete();
+						rBM.delete();
 
 
 						// Friction 2
@@ -1067,22 +1020,19 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 						tAM = MemStore.Vector3( contact.tangent2 ).multiplyScalar(-contact.bodyA.invMass * deltaLambda);
 						tBM = MemStore.Vector3( contact.tangent2 ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
+						rAM = MemStore.Vector3( contact.rAT2 ).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda);
+						rBM = MemStore.Vector3( contact.rBT2 ).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda);
 
 						contact.bodyA.velocity.add( tAM );
-						contact.bodyA.angularVelocity.add( contact.rAT2.multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+						contact.bodyA.angularVelocity.add( rAM );
 
 						contact.bodyB.velocity.add( tBM );
-						contact.bodyB.angularVelocity.add( contact.rBT2.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
-
-					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
-						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+						contact.bodyB.angularVelocity.add( rBM );
 
 						tAM.delete();
 						tBM.delete();
+						rAM.delete();
+						rBM.delete();
 
 
 						// FIXME: recalculate dV for normal ??
@@ -1104,26 +1054,24 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 						var nAM = MemStore.Vector3( contact.normal ).multiplyScalar(contact.bodyA.invMass * deltaLambda),
 							nBM = MemStore.Vector3( contact.normal ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
+						rAM = MemStore.Vector3( contact.rAN ).multiplyScalar(contact.bodyA.invInertiaTensor * deltaLambda);
+						rBM = MemStore.Vector3( contact.rBN ).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda);
 
 
 						contact.bodyA.velocity.sub( nAM );
-						contact.bodyA.angularVelocity.sub( contact.rAN.multiplyScalar(contact.bodyA.invInertiaTensor * deltaLambda) );
+						contact.bodyA.angularVelocity.sub( rAM );
 
 						contact.bodyB.velocity.add( nBM );
-						contact.bodyB.angularVelocity.add( contact.rBN.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+						contact.bodyB.angularVelocity.add( rBM );
 
 						nAM.delete();
 						nBM.delete();
+						rAM.delete();
+						rBM.delete();
 
 						dV.delete();
 
 
-					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
-						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
-					if (isNaN(contact.bodyA.velocity.x)) debugger;
-					if (isNaN(contact.bodyB.velocity.x)) debugger;
-					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
-					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 		};
 
 
@@ -1326,6 +1274,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							bodyA.wantToSleep = 0;
 							bodyA.invMass = bodyA.storedInvMass;
 							bodyA.invInertiaTensor = bodyA.storedInvInertiaTensor;
+							bodyA.updateContacts();
 						}
 						bodyA.updateState();
 
@@ -1334,12 +1283,21 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 							bodyB.wantToSleep = 0;
 							bodyB.invMass          = bodyB.storedInvMass;
 							bodyB.invInertiaTensor = bodyB.storedInvInertiaTensor;
+							bodyB.updateContacts();
 						}
 						bodyB.updateState();
 					}
 				}
 			}
 			oldHits = hits;
+
+			for (var manifoldID in contactManifolds) {
+				var manifold = contactManifolds[manifoldID];
+				for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[contactID];
+					contact.update();
+				}
+			}
 
 			Profiler.profile('PGS');
 			this.solveConstraints();

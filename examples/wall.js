@@ -29,7 +29,7 @@ define(function(){
 							body: BODY_CUBE,
 							position: new THREE.Vector3(x*scale + Math.abs(x)*slit, offsetY + y*scale + Math.abs(y)*slit, z),
 							dimensions: new THREE.Vector3(scale, scale, scale),
-							asleep: true
+							asleep: false
 						});
 					}
 				}
