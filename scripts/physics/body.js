@@ -1,5 +1,11 @@
 define(function(){
 
+	var Settings = {
+
+		colorCollisions: false,
+		colorSleep: true
+	};
+
 	var Body = function(mesh, settings){
 
 		var mass = settings.mass || 1.0;
@@ -75,6 +81,18 @@ define(function(){
 		this.wantToSleep = 0;
 
 
+		this.updateContacts = function(){
+			for (var manifoldID in this.manifolds) {
+				var manifold = this.manifolds[manifoldID];
+
+				for (var contactID in manifold.contacts) {
+					var contact = manifold.contacts[contactID];
+
+					contact.update();
+				}
+			}
+		};
+
 
 		var state = 0,
 			STATE_COLLIDING = 1<<1,
@@ -82,7 +100,7 @@ define(function(){
 
 
 
-		this.storedColor = mesh.material.color.clone();// _.clone(mesh.material.color);
+		this.storedColor = mesh.material.color.clone();
 		this.updateState = function(){
 
 			if (this.static) {
@@ -97,8 +115,8 @@ define(function(){
 			var oldState = state;
 
 			state = 0;
-			if (this.asleep) state |= STATE_ASLEEP;
-			if (!_.isEmpty(this.manifolds)) state |= STATE_COLLIDING;
+			if (this.asleep && Settings.colorSleep) state |= STATE_ASLEEP;
+			if (!_.isEmpty(this.manifolds) && Settings.colorCollisions) state |= STATE_COLLIDING;
 
 			if (oldState != state) {
 				// Change colours
