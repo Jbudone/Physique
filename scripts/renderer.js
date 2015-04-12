@@ -19,6 +19,7 @@ define(function(){
 
 			textureList: {
 				stone: { file: 'stone.png', loading:[] },
+				plastic: { material: new THREE.MeshPhongMaterial( { color: 0xffa500, emissive: 0x342100, specular: 0xfff1d9 } ) },
 				grass: { file: 'grass.jpg', options: { repeat: true }, loading:[] }
 			},
 
@@ -26,7 +27,7 @@ define(function(){
 			}
 		};
 		texturePack.textureMap[MESH_BOX] = 'stone';
-		texturePack.textureMap[MESH_SPHERE] = 'stone';
+		texturePack.textureMap[MESH_SPHERE] = 'plastic';
 		texturePack.textureMap[MESH_TETRAHEDRON] = 'stone';
 		texturePack.textureMap[MESH_OCTAHEDRON] = 'stone';
 		texturePack.textureMap[MESH_PLANE] = 'grass';
@@ -63,7 +64,9 @@ define(function(){
 					var loader = new THREE.TextureLoader();
 					var texturesToLoad = [];
 					for (var textureID in texturePack.textureList) {
-						texturesToLoad.push({ id: textureID, url: texturePack.textureList[textureID].file, options: texturePack.textureList[textureID].options });
+						if (texturePack.textureList[textureID].file) {
+							texturesToLoad.push({ id: textureID, url: texturePack.textureList[textureID].file, options: texturePack.textureList[textureID].options });
+						}
 					}
 					var loadNext = function(){
 
@@ -154,6 +157,13 @@ define(function(){
 							// add it to the scene
 							scene.add( skyboxMesh );
 
+							var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.3 );
+							directionalLight.position.set( 0, 1, 0 );
+							scene.add( directionalLight );
+
+							var hemiLight = new THREE.HemisphereLight( 0x333300, 0x333300, 0.2 ); 
+							scene.add( hemiLight );
+
 							succeeded();
 						}, function(err){
 							failed(err);
@@ -199,6 +209,8 @@ define(function(){
 				// Texture ready
 				var material = new THREE.MeshBasicMaterial( { map: texturePack.textureList[texture].texture } );
 				mesh.material = material;
+			} else if (texturePack.textureList[texture].hasOwnProperty('material')) {
+				mesh.material = texturePack.textureList[texture].material;
 			} else {
 				texturePack.textureList[texture].loading.push(mesh);
 			}

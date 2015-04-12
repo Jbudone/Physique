@@ -30,7 +30,7 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			minWakeDepth: 0.1, // NOTE: 0.04 too small
 			minIterationsBeforeSleep: 8*60,//20, // NOTE: 20 minimum for ball rolling problem
 
-			velocityIterations: 20,
+			velocityIterations: 10,
 
 			solveWorstContactsFirst: true,
 			useIslands: false,
@@ -53,6 +53,12 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 		var oldHits = null;
 
+		// FIXME: REMOVE THIS
+		var badVec = function(v){ return (isNaN(v.x) || isNaN(v.y) || isNaN(v.z) ||
+											v.x == Infinity || v.y == Infinity || v.z == Infinity ||
+											v.x == -Infinity || v.y == -Infinity || v.z == -Infinity ||
+											v.x >= 1e10 || v.y >= 1e10 || v.z >= 1e10 ||
+											v.x <= -1e10 || v.y <= -1e10 || v.z <= -1e10); };
 		var Constraint = function(){
 
 			this.J = new Array(12);
@@ -81,8 +87,36 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 			this.impulseT2 = 0;
 			this.appliedImpulse =0;
 
-			this.remove = function(){
 
+			this.rAT1 = null;
+			this.rAT1rA = null;
+			this.rBT1 = null;
+			this.rBT1rB = null;
+			this.rAT2 = null;
+			this.rAT2rA = null;
+			this.rBT2 = null;
+			this.rBT2rB = null;
+			this.rAN  = null;
+			this.rANrA  = null;
+			this.rBN  = null;
+			this.rBNrB  = null;
+
+			this.MAT1 = null;
+			this.MBT1 = null;
+			this.MAT2 = null;
+			this.MBT2 = null;
+			this.MAN = null;
+			this.MBN = null;
+
+			this.remove = function(){
+				// this.rAT1.delete(); this.rAT1rA.delete();
+				// this.rBT1.delete(); this.rBT1rB.delete();
+
+				// this.rAT2.delete(); this.rAT2rA.delete();
+				// this.rBT2.delete(); this.rBT2rB.delete();
+
+				// this.rAN.delete(); this.rANrA.delete();
+				// this.rBN.delete(); this.rBNrB.delete();
 			};
 
 			this.update = function(newInfo){
@@ -105,6 +139,35 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					this.tangent2 = new THREE.Vector3();
 					this.tangent2.copy(this.normal).cross(this.tangent1);
 
+
+					this.rAT1 = MemStore.Vector3( this.rA ).cross( this.tangent1 );
+					this.rBT1 = MemStore.Vector3( this.rB ).cross( this.tangent1 );
+					this.rAT1rA = MemStore.Vector3( this.rAT1 ).cross( this.rA );
+					this.rBT1rB = MemStore.Vector3( this.rBT1 ).cross( this.rB );
+
+					this.rAT2 = MemStore.Vector3( this.rA ).cross( this.tangent2 );
+					this.rBT2 = MemStore.Vector3( this.rB ).cross( this.tangent2 );
+					this.rAT2rA = MemStore.Vector3( this.rAT2 ).cross( this.rA );
+					this.rBT2rB = MemStore.Vector3( this.rBT2 ).cross( this.rB );
+
+					if (badVec(this.rAT1) || badVec(this.rBT1) ||
+						badVec(this.rAT2) || badVec(this.rBT2) ||
+						badVec(this.rAT1rA) || badVec(this.rBT1rB) ||
+						badVec(this.rAT2rA) || badVec(this.rBT2rB)) debugger;
+
+					this.rAN = MemStore.Vector3( this.rA ).cross( this.normal );
+					this.rBN = MemStore.Vector3( this.rB ).cross( this.normal );
+					this.rANrA = MemStore.Vector3( this.rAN ).cross( this.rA );
+					this.rBNrB = MemStore.Vector3( this.rBN ).cross( this.rB );
+
+					this.MAT1 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT1rA.dot(this.tangent1);
+					this.MBT1 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT1rB.dot(this.tangent1);
+
+					this.MAT2 = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rAT2rA.dot(this.tangent2);
+					this.MBT2 = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBT2rB.dot(this.tangent2);
+
+					this.MAN = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * this.rANrA.dot(this.normal);
+					this.MBN = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * this.rBNrB.dot(this.normal);
 				}
 
 				if (this.depth > physique.world.minDepthToWakeUp) {
@@ -536,8 +599,11 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 					contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * contact.impulseT2) );
 
 
+
 					if (isNaN(contact.bodyA.velocity.x)) debugger;
 					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 				}
 			}
 
@@ -907,96 +973,121 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 
 
 
+
+					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
+						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+
 						// Friction 1
-						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+						var dVB = MemStore.Vector3( contact.bodyB.angularVelocity ).cross(rB).add( contact.bodyB.velocity ),
+							dVA = MemStore.Vector3( contact.bodyA.angularVelocity ).cross(rA).add( contact.bodyA.velocity );
+						dV = dVB.sub(dVA);
+
+					if (badVec(dVB) || badVec(dVA)) debugger;
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+						dVA.delete();
+
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+						// dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						// dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
 						deltaVDotN = dV.dot(contact.tangent1);
 						JV = deltaVDotN;
 
-						var friction1Mass = 0.0,
-							friction2Mass = 0.0;
-						MA = 0;
-						if (contact.bodyA.invMass !== 0) {
-							// var mass = contact.bodyA.invMass,
-							// 	iner = contact.bodyA.invInertiaTensor,
-							// 	tang = contact.tangent1.clone(),
-							// 	rv   = rA.clone().cross(tang);
-							// MA = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							// MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
-							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.tangent1).cross(rA)).dot(contact.tangent1);
-						}
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
-						MB = 0;
-						if (contact.bodyB.invMass !== 0) {
-							// var mass = contact.bodyB.invMass,
-							// 	iner = contact.bodyB.invInertiaTensor,
-							// 	tang = contact.tangent1.clone(),
-							// 	rv   = rB.clone().cross(tang);
-							// MB = mass;//mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							// MB += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
-							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.tangent1).cross(rB)).dot(contact.tangent1);
-						}
-
-						deltaLambda = -JV / (MA + MB);
+						deltaLambda = -JV / (contact.MAT1 + contact.MBT1);
 						lambdaTemp = contact.impulseT1;
 						var maxImpulse = physique.world.friction * contact.impulse; 
 						contact.impulseT1 = Math.max(-maxImpulse, Math.min(maxImpulse, lambdaTemp + deltaLambda));
 						deltaLambda = contact.impulseT1 - lambdaTemp;
 
-						contact.bodyA.velocity.add( contact.tangent1.clone().multiplyScalar(-contact.bodyA.invMass * deltaLambda) );
-						contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent1).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 
-						contact.bodyB.velocity.add( contact.tangent1.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
-						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent1).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+						var tAM = MemStore.Vector3( contact.tangent1 ).multiplyScalar(-contact.bodyA.invMass * deltaLambda),
+							tBM = MemStore.Vector3( contact.tangent1 ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
+
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+
+						contact.bodyA.velocity.add( tAM );
+						contact.bodyA.angularVelocity.add( contact.rAT1.multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+
+					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
+						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+
+						contact.bodyB.velocity.add( tBM );
+						contact.bodyB.angularVelocity.add( contact.rBT1.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+
+					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
+						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+
+						tAM.delete();
+						tBM.delete();
 
 
 						// Friction 2
-						// dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-						// dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+						// FIXME: do we need to update dV after friction 1 ???
+						dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
 						deltaVDotN = dV.dot(contact.tangent2);
 						JV = deltaVDotN;
 
-						var friction1Mass = 0.0,
-							friction2Mass = 0.0;
-						MA = 0;
-						if (contact.bodyA.invMass !== 0) {
-							// var mass = contact.bodyA.invMass,
-							// 	iner = contact.bodyA.invInertiaTensor,
-							// 	tang = contact.tangent2.clone(),
-							// 	rv   = rA.clone().cross(tang);
-							// MA = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							// MA += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
-							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.tangent2).cross(rA)).dot(contact.tangent2);
-						}
-
-						MB = 0;
-						if (contact.bodyB.invMass !== 0) {
-							// var mass = contact.bodyB.invMass,
-							// 	iner = contact.bodyB.invInertiaTensor,
-							// 	tang = contact.tangent2.clone(),
-							// 	rv   = rB.clone().cross(tang);
-							// MB = mass;// mass * Math.pow(tang.x, 2) + mass * Math.pow(tang.y, 2) + mass * Math.pow(tang.z, 2);
-							// MB += iner * Math.pow(rv.x, 2) + iner * Math.pow(rv.y, 2) + iner * Math.pow(rv.z, 2);
-							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.tangent2).cross(rB)).dot(contact.tangent2);
-						}
-
-						deltaLambda = -JV / (MA + MB);
+						deltaLambda = -JV / (contact.MAT2 + contact.MBT2);
 						lambdaTemp = contact.impulseT2;
 						var maxImpulse = physique.world.friction * contact.impulse;
 						contact.impulseT2 = Math.max(-maxImpulse, Math.min(maxImpulse, lambdaTemp + deltaLambda));
 						deltaLambda = contact.impulseT2 - lambdaTemp;
 
-						contact.bodyA.velocity.add( contact.tangent2.clone().multiplyScalar(-contact.bodyA.invMass * deltaLambda) );
-						contact.bodyA.angularVelocity.add( rA.clone().cross(contact.tangent2).multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+						tAM = MemStore.Vector3( contact.tangent2 ).multiplyScalar(-contact.bodyA.invMass * deltaLambda);
+						tBM = MemStore.Vector3( contact.tangent2 ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
 
-						contact.bodyB.velocity.add( contact.tangent2.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
-						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.tangent2).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+						contact.bodyA.velocity.add( tAM );
+						contact.bodyA.angularVelocity.add( contact.rAT2.multiplyScalar(-contact.bodyA.invInertiaTensor * deltaLambda) );
+
+						contact.bodyB.velocity.add( tBM );
+						contact.bodyB.angularVelocity.add( contact.rBT2.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+
+					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
+						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
+					if (isNaN(contact.bodyA.velocity.x)) debugger;
+					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
+
+						tAM.delete();
+						tBM.delete();
 
 
-						// var dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
-						// dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
+						// FIXME: recalculate dV for normal ??
+						var dV = contact.bodyB.velocity.clone().add( contact.bodyB.angularVelocity.clone().cross(rB) );
+						dV.sub(  contact.bodyA.velocity.clone().add( contact.bodyA.angularVelocity.clone().cross(rA) ) );
 
 						var deltaVDotN = dV.dot(contact.normal),
 							JV = deltaVDotN;
@@ -1004,58 +1095,35 @@ define(['physics/collision/narrowphase', 'physics/collision/island', 'physics/co
 						var invdt = dt * (1/physique.world.scaleTime);
 						var b = Math.max(0.0, (contact.depth - physique.world.slop)) * (physique.world.baumgarte * invdt) - JV * physique.world.restitution; // TODO: restitution
 
-						// var MA = new THREE.Vector3(), MB = new THREE.Vector3();
-						var MA = 0, MB = 0;
-						if (contact.bodyA.invMass !== 0) {
-							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal.clone().negate()).cross(rA)).dot(contact.normal.clone().negate());
-							MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (rA.clone().cross(contact.normal).cross(rA)).dot(contact.normal);
-							// MA = contact.bodyA.invMass + (rA.clone().multiplyScalar(contact.bodyA.invInertiaTensor).cross(contact.normal).cross(rA)).dot(contact.normal);
-							// MA = contact.bodyA.invMass + (contact.vertexA.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyA.invInertiaTensor)).cross(contact.vertexA).dot(contact.normal.clone().negate());
-							// MA = contact.bodyA.invMass + contact.bodyA.invInertiaTensor * (contact.vertexA.clone().cross(contact.normal.clone().negate())).cross(contact.vertexA).dot(contact.normal.clone().negate());
-							// var mass = contact.bodyA.invMass,
-							// 	iner = contact.bodyA.invInertiaTensor,
-							// 	norm = contact.normal.clone().negate(),
-							// 	tang = rA.clone().cross(norm);
-							// // MA = norm.clone().multiplyScalar(mass);
-							// // MA.add( rA.clone().cross(norm).multiplyScalar(iner).cross(rA) );
-							// MA = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2); // FIXME: == mass  (since norm.dot(norm) == 1)
-							// MA += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
-						}
-						if (contact.bodyB.invMass !== 0) {
-							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal.clone().negate()).cross(rB)).dot(contact.normal.clone().negate());
-							MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (rB.clone().cross(contact.normal).cross(rB)).dot(contact.normal);
-							// MB = contact.bodyB.invMass + (rB.clone().multiplyScalar(contact.bodyB.invInertiaTensor).cross(contact.normal).cross(rB)).dot(contact.normal);
-							// MB = contact.bodyB.invMass + (contact.vertexB.clone().cross(contact.normal.clone().negate()).multiplyScalar(contact.bodyB.invInertiaTensor)).cross(contact.vertexB).dot(contact.normal.clone().negate());
-							// MB = contact.bodyB.invMass + contact.bodyB.invInertiaTensor * (contact.vertexB.clone().cross(contact.normal.clone().negate())).cross(contact.vertexB).dot(contact.normal.clone().negate());
-							// var mass = contact.bodyB.invMass,
-							// 	iner = contact.bodyB.invInertiaTensor,
-							// 	norm = contact.normal.clone().negate(),
-							// 	tang = rB.clone().cross(norm);
-							// // MB = norm.clone().multiplyScalar(-mass);
-							// // MB.sub( rB.clone().cross(norm.clone().negate()).multiplyScalar(iner).cross(rB) );
-							// MB = mass * Math.pow(norm.x, 2) + mass * Math.pow(norm.y, 2) + mass * Math.pow(norm.z, 2);
-							// MB += iner * Math.pow(tang.x, 2) + iner * Math.pow(tang.y, 2) + iner * Math.pow(tang.z, 2);
-						}
-						// var Meffective = MA.add(MB).dot(contact.normal.clone().negate());// 1 / (MA + MB);
-						var Meffective = 1/ (MA + MB);
-						var deltaLambda = (b - JV) * Meffective, //-(JV + b) / Meffective,
+						var Meffective = 1/(contact.MAN + contact.MBN);
+						var deltaLambda = (b - JV) * Meffective,
 							lambdaTemp = contact.impulse;
 
 						contact.impulse = Math.max(contact.impulse + deltaLambda, 0.0);
 						deltaLambda = contact.impulse - lambdaTemp;
 
+						var nAM = MemStore.Vector3( contact.normal ).multiplyScalar(contact.bodyA.invMass * deltaLambda),
+							nBM = MemStore.Vector3( contact.normal ).multiplyScalar(contact.bodyB.invMass * deltaLambda);
 
 
-						contact.bodyA.velocity.sub( contact.normal.clone().multiplyScalar(contact.bodyA.invMass * deltaLambda) );
-						contact.bodyA.angularVelocity.sub( rA.clone().cross(contact.normal).multiplyScalar(contact.bodyA.invInertiaTensor * deltaLambda) );
+						contact.bodyA.velocity.sub( nAM );
+						contact.bodyA.angularVelocity.sub( contact.rAN.multiplyScalar(contact.bodyA.invInertiaTensor * deltaLambda) );
 
-						contact.bodyB.velocity.add( contact.normal.clone().multiplyScalar(contact.bodyB.invMass * deltaLambda) );
-						contact.bodyB.angularVelocity.add( rB.clone().cross(contact.normal).multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+						contact.bodyB.velocity.add( nBM );
+						contact.bodyB.angularVelocity.add( contact.rBN.multiplyScalar(contact.bodyB.invInertiaTensor * deltaLambda) );
+
+						nAM.delete();
+						nBM.delete();
+
+						dV.delete();
 
 
-
+					if (badVec(contact.bodyA.velocity) || badVec(contact.bodyA.angularVelocity) ||
+						badVec(contact.bodyB.velocity) || badVec(contact.bodyB.angularVelocity)) debugger;
 					if (isNaN(contact.bodyA.velocity.x)) debugger;
 					if (isNaN(contact.bodyB.velocity.x)) debugger;
+					if (isNaN(contact.bodyA.angularVelocity.x)) debugger;
+					if (isNaN(contact.bodyB.angularVelocity.x)) debugger;
 		};
 
 

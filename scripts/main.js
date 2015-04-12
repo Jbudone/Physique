@@ -274,10 +274,11 @@ define(['input', 'scene', 'renderer', 'physics/physique'], function(Input, Scene
 			type: MESH_SPHERE,
 			body: BODY_SPHERE,
 			position: new THREE.Vector3(renderer.camera.position.x, renderer.camera.position.y, renderer.camera.position.z),
-			mass: 30.0
+			mass: 30.0,
+			dimensions: { radius: 2.0 }
 		});
 
-		var shootMultiplier = 20.0;
+		var shootMultiplier = 30.0;
 		var moveDir2 = new THREE.Vector3(0,0,-shootMultiplier);
 
 		var qX = new THREE.Quaternion(),
