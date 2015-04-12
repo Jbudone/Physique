@@ -11,8 +11,8 @@ define(function(){
 
 			var offsetY = -1.08,
 				scale = 0.8,
-				extent = 2,
-				height = 8,
+				extent = 1,
+				height = 5,
 				slit = 0.0,//0.0001,
 				walls = 1,
 				spacing = 0.01;
@@ -22,14 +22,14 @@ define(function(){
 
 				var z = wall * (scale + spacing + slit);
 				for (var x=-extent; x<=extent; ++x) {
-					for (var y=0; y<=height; ++y) {
+					for (var y=0; y<height; ++y) {
 
 						scene.addMesh({
 							type: MESH_BOX,
 							body: BODY_CUBE,
 							position: new THREE.Vector3(x*scale + Math.abs(x)*slit, offsetY + y*scale + Math.abs(y)*slit, z),
 							dimensions: new THREE.Vector3(scale, scale, scale),
-							asleep: true
+							asleep: false
 						});
 					}
 				}
