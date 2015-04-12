@@ -93,3 +93,19 @@ html, body {
 	text-align: center;
 	float: right;
 }
+
+.control-key-container {
+	margin: 10px 6px;
+}
+
+.control-key {
+	background: #000;
+	border: thin solid #333;
+	padding: 2px 4px;
+	font-family: verdana;
+	border-radius: 8px;
+}
+
+.control-key-desc {
+
+}
